@@ -39,19 +39,11 @@ export function Hero() {
   const sceneOpacity = useTransform(scrollYProgress, [0, 0.7], [1, 0]);
 
   React.useEffect(() => {
-    // `requestIdleCallback` where available, so the WebGL context is created
-    // during a quiet moment rather than competing with hydration.
-    const schedule =
-      typeof window.requestIdleCallback === 'function'
-        ? window.requestIdleCallback
-        : (callback: () => void) => window.setTimeout(callback, 400);
-
-    const handle = schedule(() => setShowScene(true));
-    return () => {
-      if (typeof window.cancelIdleCallback === 'function' && typeof handle === 'number') {
-        window.cancelIdleCallback(handle);
-      }
-    };
+    // Deferred one frame past hydration rather than to an idle callback:
+    // `requestIdleCallback` can be starved indefinitely on a busy page, and the
+    // scene is the hero's main visual — arriving late reads as not arriving.
+    const handle = window.setTimeout(() => setShowScene(true), 60);
+    return () => window.clearTimeout(handle);
   }, []);
 
   return (

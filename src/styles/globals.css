@@ -421,11 +421,11 @@
    */
   .mask-hero-scene {
     mask-image: radial-gradient(
-      ellipse 38% 30% at 50% 40%,
-      rgba(0, 0, 0, 0.12) 0%,
-      rgba(0, 0, 0, 0.3) 45%,
-      rgba(0, 0, 0, 0.85) 72%,
-      black 90%
+      ellipse 33% 32% at 50% 42%,
+      rgba(0, 0, 0, 0.16) 0%,
+      rgba(0, 0, 0, 0.34) 46%,
+      rgba(0, 0, 0, 0.88) 72%,
+      black 88%
     );
   }
 
