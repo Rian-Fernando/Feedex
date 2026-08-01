@@ -2,12 +2,14 @@ import Link from 'next/link';
 import {
   ArrowRight,
   Boxes,
-  Check,
   Filter,
   Gauge,
+  Heart,
   KeyRound,
   Layers,
   Puzzle,
+  Scale,
+  Server,
   ShieldCheck,
   Sparkles,
   Terminal,
@@ -18,6 +20,7 @@ import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { GithubIcon } from '@/components/brand/github-icon';
 import { Reveal, RevealGroup, RevealItem } from './reveal';
 import { siteConfig } from '@/config/site';
 
@@ -225,122 +228,76 @@ export function Developers() {
   );
 }
 
-/* --------------------------------- Pricing --------------------------------- */
+/* ------------------------------- Open source ------------------------------- */
 
-const TIERS = [
+const FREEDOMS = [
   {
-    name: 'Self-hosted',
-    price: 'Free',
-    cadence: 'forever',
-    description: 'Clone it, run it, own the data. The whole thing is MIT licensed.',
-    features: [
-      'Unlimited projects',
-      'Unlimited feedback',
-      'Full REST API',
-      'Bring your own Postgres',
-      'No telemetry',
-    ],
-    cta: 'View on GitHub',
-    href: siteConfig.links.github,
-    external: true,
-    featured: false,
+    icon: Heart,
+    title: 'Free, with no tier above it',
+    description:
+      'Every feature is in the box. There is no plan to upgrade to, no seat count, and no usage meter counting your feedback.',
   },
   {
-    name: 'Hosted',
-    price: 'Free',
-    cadence: 'while in beta',
-    description: 'The same product, running on infrastructure that is not yours to maintain.',
-    features: [
-      'Everything in self-hosted',
-      'Managed Postgres and backups',
-      'Automatic updates',
-      'Email notifications',
-      'Priority support',
-    ],
-    cta: 'Create a workspace',
-    href: '/register',
-    external: false,
-    featured: true,
+    icon: Scale,
+    title: 'MIT licensed',
+    description:
+      'Read it, fork it, run it commercially, change whatever you like. The whole application and the widget are in one public repository.',
   },
   {
-    name: 'Team',
-    price: 'Planned',
-    cadence: '',
-    description: 'For when the workspace stops being one person.',
-    features: [
-      'Multiple members and roles',
-      'GitHub and Linear sync',
-      'Slack and Discord delivery',
-      'Feature voting and roadmaps',
-      'Analytics and SLA reporting',
-    ],
-    cta: 'Follow along',
-    href: siteConfig.links.github,
-    external: true,
-    featured: false,
+    icon: Server,
+    title: 'Self-host it',
+    description:
+      'Point it at your own PostgreSQL and deploy it anywhere Node runs. Your feedback stays in a database you control.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'No tracking of your users',
+    description:
+      'The widget reads no cookies, writes no storage, and builds no fingerprint. It collects what is needed to reproduce a bug and nothing else.',
   },
 ] as const;
 
-export function Pricing() {
+export function OpenSource() {
   return (
     <Section
-      id="pricing"
-      eyebrow="Pricing"
-      title="Free while it earns its keep"
-      description="Feedex is open source and in active development. Pricing for team features will land when those features do."
+      id="open-source"
+      eyebrow="Open source"
+      title="Free, and built to stay that way"
+      description="Feedex is MIT licensed and developed in the open. Use the hosted instance or run your own — they are the same application."
     >
-      <RevealGroup className="grid gap-4 lg:grid-cols-3">
-        {TIERS.map((tier) => (
-          <RevealItem key={tier.name}>
-            <Card
-              className={cn(
-                'flex h-full flex-col p-6',
-                tier.featured && 'relative border-accent-500/40 shadow-raised',
-              )}
-            >
-              {tier.featured ? (
-                <Badge tone="accent" className="absolute -top-2.5 left-6">
-                  Recommended
-                </Badge>
-              ) : null}
-
-              <h3 className="text-[0.9375rem] font-semibold text-fg">{tier.name}</h3>
-
-              <p className="mt-3 flex items-baseline gap-1.5">
-                <span className="text-3xl font-semibold tracking-tight text-fg">{tier.price}</span>
-                {tier.cadence ? (
-                  <span className="text-sm text-fg-subtle">{tier.cadence}</span>
-                ) : null}
-              </p>
-
-              <p className="mt-3 text-sm leading-relaxed text-fg-muted">{tier.description}</p>
-
-              <ul className="mt-5 flex flex-1 flex-col gap-2.5">
-                {tier.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-2">
-                    <Check aria-hidden className="mt-0.5 size-3.5 shrink-0 text-success-500" />
-                    <span className="text-sm text-fg-muted">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <Button
-                asChild
-                variant={tier.featured ? 'primary' : 'secondary'}
-                className="mt-6 w-full"
-              >
-                {tier.external ? (
-                  <a href={tier.href} target="_blank" rel="noopener noreferrer">
-                    {tier.cta}
-                  </a>
-                ) : (
-                  <Link href={tier.href}>{tier.cta}</Link>
-                )}
-              </Button>
+      <RevealGroup className="grid gap-4 sm:grid-cols-2">
+        {FREEDOMS.map((item) => (
+          <RevealItem key={item.title}>
+            <Card className="flex h-full gap-4 p-5">
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gold-500/12 text-gold-600 dark:text-gold-500">
+                <item.icon aria-hidden className="size-4.5" />
+              </span>
+              <span className="min-w-0">
+                <h3 className="text-[0.9375rem] font-semibold text-fg">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-fg-muted">{item.description}</p>
+              </span>
             </Card>
           </RevealItem>
         ))}
       </RevealGroup>
+
+      <Reveal
+        delay={0.1}
+        className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row"
+      >
+        <Button asChild size="lg">
+          <Link href="/register">
+            Create a workspace
+            <ArrowRight aria-hidden className="size-4" />
+          </Link>
+        </Button>
+        <Button asChild variant="secondary" size="lg">
+          <a href={siteConfig.links.github} target="_blank" rel="noopener noreferrer">
+            <GithubIcon className="size-4" />
+            View the source
+          </a>
+        </Button>
+      </Reveal>
     </Section>
   );
 }
@@ -368,7 +325,7 @@ export const FAQ_ITEMS = [
   {
     question: 'Is Feedex free?',
     answer:
-      'Yes. Feedex is MIT licensed and can be self-hosted at no cost with your own PostgreSQL database. The hosted version at feedex.rianfernando.com is free while it is in beta. Paid pricing is planned only for team features such as multiple members, integrations, and analytics.',
+      'Yes, entirely. Feedex is MIT licensed, so you can self-host it at no cost with your own PostgreSQL database, and the hosted instance at feedex.rianfernando.com is free to use. There is no paid tier, no seat pricing, and no usage limit on your feedback.',
   },
   {
     question: 'Who is Feedex for?',

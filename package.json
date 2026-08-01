@@ -39,6 +39,8 @@
     "@electric-sql/pglite": "0.5.4",
     "@react-three/drei": "10.7.7",
     "@react-three/fiber": "9.7.0",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "clsx": "2.1.1",
     "drizzle-orm": "0.45.2",
     "lucide-react": "1.28.0",

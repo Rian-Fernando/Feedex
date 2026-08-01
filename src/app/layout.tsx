@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import { Space_Grotesk, Space_Mono } from 'next/font/google';
 import { Toaster } from 'sonner';
+import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 import { siteConfig } from '@/config/site';
 import { ThemeProvider, ThemeScript } from '@/components/theme-provider';
@@ -125,6 +127,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               Skip to content
             </a>
             {children}
+            {/*
+              Vercel Web Analytics and Speed Insights. Both are cookieless and
+              collect no personal data, so they need no consent banner. They
+              load after hydration and never block a paint.
+            */}
+            <Analytics />
+            <SpeedInsights />
             <Toaster
               position="bottom-right"
               toastOptions={{

@@ -8,7 +8,7 @@ import {
   Developers,
   Faq,
   Features,
-  Pricing,
+  OpenSource,
   Section,
 } from '@/components/marketing/sections';
 import { HomeStructuredData } from '@/components/seo/structured-data';
@@ -43,7 +43,7 @@ export default function HomePage() {
 
       <Developers />
 
-      <Pricing />
+      <OpenSource />
 
       <Faq />
 

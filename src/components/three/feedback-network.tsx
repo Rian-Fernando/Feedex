@@ -5,6 +5,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { usePrefersReducedMotion } from '@/lib/use-media-query';
+import { useTheme } from '@/components/theme-provider';
 
 /**
  * Hero visualisation: a feedback network.
@@ -18,8 +19,8 @@ import { usePrefersReducedMotion } from '@/lib/use-media-query';
  * `prefers-reduced-motion`.
  */
 
-const NODE_COUNT = 8;
-const RADIUS = 4.6;
+const NODE_COUNT = 10;
+const RADIUS = 3.9;
 
 /**
  * Brand duotone. Gold is the customer's voice, violet the developer's response,
@@ -28,7 +29,7 @@ const RADIUS = 4.6;
  */
 const GOLD = new THREE.Color('#F7B83D');
 const VIOLET = new THREE.Color('#B58BF9');
-const EDGE = new THREE.Color('#8B7F99');
+const EDGE = new THREE.Color('#B58BF9');
 
 interface NodeSpec {
   position: THREE.Vector3;
@@ -56,7 +57,7 @@ function useNodes(): NodeSpec[] {
           Math.sin(angle) * radius * 0.62,
           Math.sin(i * 7.233) * 0.9,
         ),
-        scale: 0.068 + Math.abs(wobble) * 0.03,
+        scale: 0.115 + Math.abs(wobble) * 0.05,
         phase: i * 0.9,
         // Alternating rather than random, so neither hue ever clusters.
         voice: i % 2 === 0 ? 'customer' : 'developer',
@@ -68,7 +69,7 @@ function useNodes(): NodeSpec[] {
 }
 
 /** The converging edges, drawn as one merged line geometry. */
-function Edges({ nodes }: { nodes: NodeSpec[] }) {
+function Edges({ nodes, dark }: { nodes: NodeSpec[]; dark: boolean }) {
   const geometry = React.useMemo(() => {
     const positions: number[] = [];
 
@@ -85,13 +86,22 @@ function Edges({ nodes }: { nodes: NodeSpec[] }) {
 
   return (
     <lineSegments geometry={geometry}>
-      <lineBasicMaterial color={EDGE} transparent opacity={0.24} />
+      {/* Thin violet lines need more alpha to register against paper. */}
+      <lineBasicMaterial color={EDGE} transparent opacity={dark ? 0.45 : 0.6} />
     </lineSegments>
   );
 }
 
 /** Project nodes, gently breathing. */
-function Nodes({ nodes, reducedMotion }: { nodes: NodeSpec[]; reducedMotion: boolean }) {
+function Nodes({
+  nodes,
+  reducedMotion,
+  dark,
+}: {
+  nodes: NodeSpec[];
+  reducedMotion: boolean;
+  dark: boolean;
+}) {
   const meshRef = React.useRef<THREE.InstancedMesh>(null);
   const dummy = React.useMemo(() => new THREE.Object3D(), []);
 
@@ -129,8 +139,19 @@ function Nodes({ nodes, reducedMotion }: { nodes: NodeSpec[]; reducedMotion: boo
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, nodes.length]}>
       <sphereGeometry args={[1, 20, 20]} />
-      {/* White base so the per-instance colour is the colour actually seen. */}
-      <meshBasicMaterial color="#ffffff" transparent opacity={0.9} />
+      {/*
+        White base so the per-instance colour is the colour actually seen.
+
+        Additive blending reads as a glow on the plum ground and is what gives
+        the nodes presence without a post-processing pass — but it composites
+        toward white on the paper surface, so light mode uses normal blending.
+      */}
+      <meshBasicMaterial
+        color="#ffffff"
+        transparent
+        opacity={1}
+        blending={dark ? THREE.AdditiveBlending : THREE.NormalBlending}
+      />
     </instancedMesh>
   );
 }
@@ -141,7 +162,15 @@ function Nodes({ nodes, reducedMotion }: { nodes: NodeSpec[]; reducedMotion: boo
  * Positions are written into a single instanced mesh each frame rather than
  * mounting a mesh per pulse, so the whole effect costs one draw call.
  */
-function Pulses({ nodes, reducedMotion }: { nodes: NodeSpec[]; reducedMotion: boolean }) {
+function Pulses({
+  nodes,
+  reducedMotion,
+  dark,
+}: {
+  nodes: NodeSpec[];
+  reducedMotion: boolean;
+  dark: boolean;
+}) {
   const meshRef = React.useRef<THREE.InstancedMesh>(null);
   const dummy = React.useMemo(() => new THREE.Object3D(), []);
   const origin = React.useMemo(() => new THREE.Vector3(0, 0, 0), []);
@@ -165,14 +194,17 @@ function Pulses({ nodes, reducedMotion }: { nodes: NodeSpec[]; reducedMotion: bo
 
     nodes.forEach((node, index) => {
       // Each pulse runs 0 → 1 along its edge on its own offset cycle.
-      const progress = reducedMotion ? 0.5 : (time * 0.32 + index / nodes.length) % 1;
+      // Frozen mid-flight under reduced motion, so the composition still reads.
+      const progress = reducedMotion
+        ? (index / nodes.length + 0.3) % 1
+        : (time * 0.32 + index / nodes.length) % 1;
       const eased = progress * progress * (3 - 2 * progress);
 
       dummy.position.lerpVectors(node.position, origin, eased);
 
       // Fade in at the start and out at the end so pulses do not pop.
       const fade = Math.sin(progress * Math.PI);
-      dummy.scale.setScalar(0.032 * fade);
+      dummy.scale.setScalar(0.06 * fade);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
     });
@@ -183,7 +215,12 @@ function Pulses({ nodes, reducedMotion }: { nodes: NodeSpec[]; reducedMotion: bo
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, nodes.length]}>
       <sphereGeometry args={[1, 12, 12]} />
-      <meshBasicMaterial color="#ffffff" transparent opacity={0.8} />
+      <meshBasicMaterial
+        color="#ffffff"
+        transparent
+        opacity={1}
+        blending={dark ? THREE.AdditiveBlending : THREE.NormalBlending}
+      />
     </instancedMesh>
   );
 }
@@ -201,13 +238,13 @@ function Core({ reducedMotion }: { reducedMotion: boolean }) {
   return (
     <group>
       <mesh>
-        <icosahedronGeometry args={[0.22, 1]} />
-        <meshBasicMaterial color={VIOLET} transparent opacity={0.9} />
+        <icosahedronGeometry args={[0.26, 1]} />
+        <meshBasicMaterial color={VIOLET} transparent opacity={0.55} />
       </mesh>
       {/* Gold halo: the customer's voice arriving at the developer's inbox. */}
       <mesh ref={haloRef}>
-        <icosahedronGeometry args={[0.42, 1]} />
-        <meshBasicMaterial color={GOLD} transparent opacity={0.22} wireframe />
+        <icosahedronGeometry args={[0.6, 1]} />
+        <meshBasicMaterial color={GOLD} transparent opacity={0.32} wireframe />
       </mesh>
     </group>
   );
@@ -219,7 +256,7 @@ function Core({ reducedMotion }: { reducedMotion: boolean }) {
  * Applied to the whole group rather than the camera, so it composes with the
  * page's own scroll transforms without fighting them.
  */
-function Scene({ reducedMotion }: { reducedMotion: boolean }) {
+function Scene({ reducedMotion, dark }: { reducedMotion: boolean; dark: boolean }) {
   const groupRef = React.useRef<THREE.Group>(null);
   const nodes = useNodes();
   const { viewport } = useThree();
@@ -243,13 +280,13 @@ function Scene({ reducedMotion }: { reducedMotion: boolean }) {
   });
 
   // Shrink the whole scene on narrow viewports so it stays inside the frame.
-  const scale = Math.min(1, viewport.width / 11);
+  const scale = Math.min(1, viewport.width / 9.5);
 
   return (
     <group ref={groupRef} scale={scale}>
-      <Edges nodes={nodes} />
-      <Nodes nodes={nodes} reducedMotion={reducedMotion} />
-      <Pulses nodes={nodes} reducedMotion={reducedMotion} />
+      <Edges nodes={nodes} dark={dark} />
+      <Nodes nodes={nodes} reducedMotion={reducedMotion} dark={dark} />
+      <Pulses nodes={nodes} reducedMotion={reducedMotion} dark={dark} />
       <Core reducedMotion={reducedMotion} />
     </group>
   );
@@ -259,11 +296,13 @@ export function FeedbackNetwork({ className }: { className?: string }) {
   // Read from the media query directly rather than mirroring it into state:
   // the very first frame is the one that has to be right.
   const reducedMotion = usePrefersReducedMotion();
+  const { resolved } = useTheme();
+  const dark = resolved === 'dark';
 
   return (
     <div className={className} aria-hidden>
       <Canvas
-        camera={{ position: [0, 0, 11], fov: 42 }}
+        camera={{ position: [0, 0, 9], fov: 45 }}
         // Capped so the scene does not render at 3x on high-density displays
         // for no visible benefit.
         dpr={[1, 1.75]}
@@ -272,7 +311,7 @@ export function FeedbackNetwork({ className }: { className?: string }) {
         // loop is stopped entirely rather than spinning at 60fps.
         frameloop={reducedMotion ? 'demand' : 'always'}
       >
-        <Scene reducedMotion={reducedMotion} />
+        <Scene reducedMotion={reducedMotion} dark={dark} />
       </Canvas>
     </div>
   );

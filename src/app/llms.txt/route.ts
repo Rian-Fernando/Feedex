@@ -59,7 +59,7 @@ Feedex does not use AI in this version. AI-assisted categorisation, duplicate de
 
 ## Pricing
 
-Feedex is free. The source is MIT licensed and can be self-hosted at no cost. The hosted instance is free while in beta. Paid pricing is planned only for future team features.
+Feedex is free. The source is MIT licensed and can be self-hosted at no cost with your own PostgreSQL database, and the hosted instance is free to use. There is no paid tier, no per-seat pricing, and no usage limit on feedback volume.
 
 ## Who it is for
 

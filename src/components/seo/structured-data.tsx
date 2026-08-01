@@ -47,7 +47,8 @@ export function HomeStructuredData() {
           price: '0',
           priceCurrency: 'USD',
           availability: 'https://schema.org/InStock',
-          description: 'Free while in beta. Self-hosting is free under the MIT licence.',
+          description:
+            'Free to use. Self-hosting is free under the MIT licence. There is no paid tier.',
         },
         featureList: [
           'Embeddable feedback widget',

@@ -14,7 +14,7 @@ const LINKS = [
   { href: '#features', label: 'Features' },
   { href: '#tour', label: 'How it works' },
   { href: '#developers', label: 'Developers' },
-  { href: '#pricing', label: 'Pricing' },
+  { href: '#open-source', label: 'Open source' },
   { href: '#faq', label: 'FAQ' },
 ] as const;
 

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { mkdirSync } from 'node:fs';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { env } from '@/config/env';
+import { env, isProduction, requireDatabaseUrl } from '@/config/env';
 import * as schema from './schema';
 
 export * as schema from './schema';
@@ -35,6 +35,12 @@ type DbGlobal = {
 const globalRef = globalThis as unknown as DbGlobal;
 
 function usingPostgres(): boolean {
+  // In production the answer is always yes: `requireDatabaseUrl` throws rather
+  // than let the process fall back to an ephemeral embedded database.
+  if (isProduction()) {
+    requireDatabaseUrl();
+    return true;
+  }
   return Boolean(env().DATABASE_URL);
 }
 
@@ -43,7 +49,7 @@ async function createPostgresClient(): Promise<Database> {
   const { drizzle } = await import('drizzle-orm/node-postgres');
 
   const pool = new Pool({
-    connectionString: env().DATABASE_URL,
+    connectionString: requireDatabaseUrl(),
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,

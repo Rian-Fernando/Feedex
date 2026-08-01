@@ -17,8 +17,12 @@ const securityHeaders = [
     value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
   },
   {
+    // No `preload`: that directive is a commitment to the browser preload list
+    // and should only be sent from an apex you have actually submitted. Sent
+    // from a subdomain it buys nothing, and it makes a certificate problem
+    // unrecoverable in a browser that has already cached the policy.
     key: 'Strict-Transport-Security',
-    value: 'max-age=63072000; includeSubDomains; preload',
+    value: 'max-age=31536000; includeSubDomains',
   },
 ];
 

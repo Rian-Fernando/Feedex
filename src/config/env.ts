@@ -70,20 +70,11 @@ function parse(): ServerEnv {
     throw new Error(`Invalid environment variables:\n${issues}`);
   }
 
-  const value = parsed.data;
-
-  if (value.NODE_ENV === 'production' && !isBuildPhase()) {
-    if (!value.DATABASE_URL) {
-      throw new Error('DATABASE_URL is required in production.');
-    }
-    if (!value.AUTH_SECRET) {
-      throw new Error(
-        'AUTH_SECRET is required in production. Generate one with: openssl rand -base64 48',
-      );
-    }
-  }
-
-  return value;
+  // Shape only. Production requirements are enforced where the value is
+  // actually used — see `requireDatabaseUrl` and `authSecret` — so that a page
+  // which never touches the database still renders on a half-configured
+  // instance instead of returning an opaque 500.
+  return parsed.data;
 }
 
 export function env(): ServerEnv {
@@ -93,13 +84,57 @@ export function env(): ServerEnv {
 
 /**
  * Development fallback secret. Deterministic so that sessions and API keys
- * survive a dev-server restart, but never used in production because `parse()`
- * rejects a missing AUTH_SECRET there.
+ * survive a dev-server restart. Never reachable in production, because
+ * `authSecret()` throws there instead of falling back.
  */
 const DEV_SECRET = 'feedex-development-secret-do-not-use-in-production-0000';
 
+/** Raised when a required production value is absent. */
+export class ConfigurationError extends Error {
+  readonly variable: string;
+
+  constructor(variable: string, guidance: string) {
+    super(`${variable} is not set. ${guidance}`);
+    this.name = 'ConfigurationError';
+    this.variable = variable;
+  }
+}
+
+/**
+ * The connection string, or a precise error explaining what to set.
+ *
+ * Deliberately never falls back to the embedded database in production. A
+ * serverless filesystem is ephemeral and per-instance, so falling back would
+ * silently accept writes and then lose them — far worse than refusing to start.
+ */
+export function requireDatabaseUrl(): string {
+  const value = env().DATABASE_URL;
+
+  if (!value) {
+    throw new ConfigurationError(
+      'DATABASE_URL',
+      'Feedex needs a PostgreSQL connection string in production. Provision a database ' +
+        '(Neon, Supabase, or any Postgres 14+) and set DATABASE_URL, then run `npm run db:migrate`. ' +
+        'See docs/DEPLOYMENT.md.',
+    );
+  }
+
+  return value;
+}
+
 export function authSecret(): string {
-  return env().AUTH_SECRET ?? DEV_SECRET;
+  const value = env().AUTH_SECRET;
+  if (value) return value;
+
+  if (isProduction() && !isBuildPhase()) {
+    throw new ConfigurationError(
+      'AUTH_SECRET',
+      'Generate one with `openssl rand -base64 48` and set it in your environment. ' +
+        'It keys the HMAC used for secret API keys, so it must stay stable once set.',
+    );
+  }
+
+  return DEV_SECRET;
 }
 
 export function isProduction(): boolean {

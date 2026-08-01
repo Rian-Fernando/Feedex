@@ -74,8 +74,8 @@ surface. Only worth doing with strict redaction and explicit consent.
 
 ## Not planned
 
-**A hosted plan with per-seat pricing, before there are seats.** Pricing
-follows features.
+**A paid tier.** Feedex is free and MIT licensed, and the intent is to keep it
+that way. Team features will ship as part of the same free product.
 
 **Mobile SDKs.** The REST API already accepts submissions from any client.
 
