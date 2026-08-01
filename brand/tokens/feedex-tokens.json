@@ -1,0 +1,72 @@
+{
+  "color": {
+    "gold": {
+      "value": "#F7B83D",
+      "oklch": "oklch(0.82 0.15 80)",
+      "meaning": "the customer's voice"
+    },
+    "violet": {
+      "value": "#B58BF9",
+      "oklch": "oklch(0.72 0.16 300)",
+      "meaning": "the developer's response"
+    },
+    "plum": {
+      "value": "#17101F",
+      "role": "primary ground and arrow knockout"
+    },
+    "plumElevated": {
+      "value": "#1E1529",
+      "role": "cards and panels on plum"
+    },
+    "paper": {
+      "value": "#F4F1EA",
+      "role": "light surface"
+    },
+    "textOnDark": {
+      "value": "#F6F2F8"
+    },
+    "textMutedDark": {
+      "value": "#8B7F99"
+    },
+    "textOnLight": {
+      "value": "#17101F"
+    },
+    "textMutedLight": {
+      "value": "#8D8778"
+    },
+    "borderDark": {
+      "value": "rgba(255,255,255,0.10)"
+    },
+    "borderLight": {
+      "value": "#E3DED2"
+    }
+  },
+  "font": {
+    "display": {
+      "value": "'Space Grotesk', system-ui, sans-serif",
+      "weights": [
+        400,
+        500,
+        600,
+        700
+      ]
+    },
+    "mono": {
+      "value": "'Space Mono', ui-monospace, monospace",
+      "weights": [
+        400,
+        700
+      ]
+    }
+  },
+  "tracking": {
+    "display": "-0.03em",
+    "label": "0.28em"
+  },
+  "radius": {
+    "sm": "6px",
+    "md": "10px",
+    "pill": "999px",
+    "icon": "22%"
+  }
+}

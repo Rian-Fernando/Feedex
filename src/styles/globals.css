@@ -1,0 +1,519 @@
+@import 'tailwindcss';
+
+/*
+ * Feedex design system
+ * --------------------
+ * Implements the Feedex brand handoff ("The Conversation Loop").
+ *
+ * Two brand accents carry the product's idea:
+ *   - gold   #F7B83D — the customer's voice
+ *   - violet #B58BF9 — the developer's response
+ *
+ * Both are *brand* colours. Per the handoff they are deliberately never used to
+ * signal state: gold is not a warning and violet is not a link. The semantic
+ * ramps below sit at hues far enough from both that a status can never be
+ * mistaken for branding.
+ *
+ * Violet is the primary interactive colour, because the dashboard is the
+ * developer's side of the loop. It is a light tint, so filled violet surfaces
+ * take plum text rather than white — which is both on-brand and the higher
+ * contrast pairing.
+ *
+ * The neutral ramp is not one scale but two. The handoff specifies cool plum
+ * neutrals on dark (hue ~305) and warm paper neutrals on light (hue ~88), so
+ * each theme gets its own family rather than a single ramp tinted twice.
+ *
+ * Colour is expressed in OKLCH: perceptual lightness comes first, so a scale
+ * steps evenly to the eye and contrast stays predictable when a hue is retuned.
+ */
+
+@theme {
+  /* ---------------------------------------------------------------- fonts */
+  --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* ------------------------------------------------------- brand: violet */
+  /* Anchor: 500 = #B58BF9 = oklch(72.1% 0.1596 300). */
+  --color-accent-50: oklch(96.5% 0.018 300);
+  --color-accent-100: oklch(93.5% 0.038 300);
+  --color-accent-200: oklch(88% 0.075 300);
+  --color-accent-300: oklch(81% 0.115 300);
+  --color-accent-400: oklch(76.5% 0.14 300);
+  --color-accent-500: oklch(72.1% 0.1596 300);
+  --color-accent-600: oklch(64% 0.18 300);
+  --color-accent-700: oklch(55% 0.19 301);
+  --color-accent-800: oklch(45% 0.168 302);
+  --color-accent-900: oklch(36% 0.135 303);
+
+  /* --------------------------------------------------------- brand: gold */
+  /* Anchor: 500 = #F7B83D = oklch(82.1% 0.1504 80). */
+  --color-gold-50: oklch(97.5% 0.022 82);
+  --color-gold-100: oklch(95% 0.048 82);
+  --color-gold-200: oklch(91% 0.09 81);
+  --color-gold-300: oklch(86.5% 0.125 80);
+  --color-gold-400: oklch(84% 0.142 80);
+  --color-gold-500: oklch(82.1% 0.1504 80);
+  --color-gold-600: oklch(73% 0.138 77);
+  --color-gold-700: oklch(62% 0.118 74);
+  --color-gold-800: oklch(50% 0.096 72);
+  --color-gold-900: oklch(39% 0.075 70);
+
+  /* ------------------------------------------------ neutral: plum (dark) */
+  /* Ground = #17101F = oklch(19% 0.0313 305). */
+  --color-plum-50: oklch(96.6% 0.009 315);
+  --color-plum-100: oklch(93% 0.012 310);
+  --color-plum-200: oklch(86% 0.016 308);
+  --color-plum-300: oklch(76% 0.024 307);
+  --color-plum-400: oklch(66% 0.034 306);
+  --color-plum-500: oklch(61.6% 0.041 306);
+  --color-plum-600: oklch(48% 0.044 305);
+  --color-plum-700: oklch(34% 0.046 305);
+  --color-plum-800: oklch(26% 0.044 304);
+  --color-plum-850: oklch(21.7% 0.0401 304);
+  --color-plum-900: oklch(19% 0.0313 305);
+  --color-plum-950: oklch(14% 0.026 305);
+
+  /* ----------------------------------------------- neutral: paper (light) */
+  /* Surface = #F4F1EA = oklch(95.9% 0.0098 87.5). */
+  --color-paper-50: oklch(98.4% 0.005 88);
+  --color-paper-100: oklch(95.9% 0.0098 87.5);
+  --color-paper-200: oklch(93% 0.014 88);
+  --color-paper-300: oklch(90.1% 0.017 88);
+  --color-paper-400: oklch(78% 0.021 89);
+  --color-paper-500: oklch(62.4% 0.0231 89);
+  --color-paper-600: oklch(50% 0.024 88);
+  --color-paper-700: oklch(38% 0.023 88);
+
+  /*
+   * ---------------------------------------------------------- semantic
+   * Held clear of the brand hues on purpose. Gold sits at 80 and violet at
+   * 300, so warning is pushed down to 45 (unmistakably orange, not gold) and
+   * info up to 235 (unmistakably blue, not violet).
+   */
+  --color-success-400: oklch(78% 0.14 150);
+  --color-success-500: oklch(70% 0.16 150);
+  --color-success-600: oklch(59% 0.15 150);
+
+  --color-warning-400: oklch(80% 0.15 45);
+  --color-warning-500: oklch(72% 0.17 45);
+  --color-warning-600: oklch(62% 0.16 43);
+
+  --color-danger-400: oklch(72% 0.18 22);
+  --color-danger-500: oklch(63% 0.21 22);
+  --color-danger-600: oklch(54% 0.2 22);
+
+  --color-info-400: oklch(78% 0.12 235);
+  --color-info-500: oklch(70% 0.14 235);
+  --color-info-600: oklch(59% 0.14 238);
+
+  /* ----------------------------------------------------------------- radii */
+  /*
+   * Chosen so that existing utility usage lands on the handoff's intent:
+   * `rounded-md` on small controls is its 6px, `rounded-xl` on cards is its
+   * 10px, and `rounded-full` is the pill.
+   */
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 14px;
+  --radius-3xl: 20px;
+
+  /* ------------------------------------------------------------ typography */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-2xs--letter-spacing: 0.02em;
+
+  /* Handoff tracking values, exposed as utilities. */
+  --tracking-display: -0.03em;
+  --tracking-label: 0.28em;
+
+  /* ---------------------------------------------------------------- motion */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-quint: cubic-bezier(0.83, 0, 0.17, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --animate-fade-in: fade-in 0.4s var(--ease-out-quint) both;
+  --animate-rise: rise 0.5s var(--ease-out-quint) both;
+  --animate-shimmer: shimmer 2.5s linear infinite;
+  --animate-pulse-ring: pulse-ring 2.4s var(--ease-out-quint) infinite;
+
+  /* Overlay and popover transitions, driven by Radix `data-state`. */
+  --animate-overlay-in: fade-in 0.2s var(--ease-out-quint) both;
+  --animate-overlay-out: fade-out 0.15s var(--ease-in-out-quint) both;
+  --animate-dialog-in: dialog-in 0.22s var(--ease-out-quint) both;
+  --animate-dialog-out: dialog-out 0.15s var(--ease-in-out-quint) both;
+  --animate-popover-in: popover-in 0.16s var(--ease-out-quint) both;
+  --animate-popover-out: fade-out 0.12s var(--ease-in-out-quint) both;
+
+  /* Arrow travel for the animated logo mark. */
+  --animate-loop-arrows: loop-arrows 3.2s var(--ease-in-out-quint) infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/*
+ * Dialogs are centred with a translate, so their entrance has to compose the
+ * scale onto that existing transform rather than replace it.
+ */
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes dialog-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+}
+
+@keyframes popover-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -200% 0;
+  }
+  to {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/*
+ * The mark's two arrows travelling their own paths. Per the handoff this is the
+ * only sanctioned animation of the logo — the mark itself never rotates or
+ * bounces.
+ */
+@keyframes loop-arrows {
+  0%,
+  100% {
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dashoffset: -14;
+  }
+}
+
+/*
+ * Semantic surface tokens.
+ *
+ * Components address these rather than the palettes above, so light and dark
+ * are one variable swap instead of a `dark:` variant on every element.
+ */
+@layer base {
+  :root {
+    --surface-base: var(--color-paper-100);
+    --surface-raised: oklch(98.8% 0.004 88);
+    --surface-sunken: var(--color-paper-200);
+    --surface-overlay: oklch(99.2% 0.003 88);
+    --surface-inset: var(--color-paper-200);
+
+    --border-subtle: oklch(92.5% 0.014 88);
+    --border-default: var(--color-paper-300);
+    --border-strong: oklch(84% 0.02 88);
+
+    --text-primary: oklch(19% 0.0313 305);
+    --text-secondary: oklch(45% 0.022 88);
+    --text-tertiary: var(--color-paper-500);
+    --text-inverse: var(--color-plum-50);
+
+    --shadow-ambient: 0 1px 2px oklch(19% 0.03 305 / 0.06), 0 1px 3px oklch(19% 0.03 305 / 0.04);
+    --shadow-raised: 0 2px 4px oklch(19% 0.03 305 / 0.05), 0 8px 16px oklch(19% 0.03 305 / 0.07);
+    --shadow-overlay: 0 12px 24px oklch(19% 0.03 305 / 0.1), 0 24px 48px oklch(19% 0.03 305 / 0.08);
+
+    color-scheme: light;
+  }
+
+  .dark {
+    --surface-base: var(--color-plum-900);
+    --surface-raised: var(--color-plum-850);
+    --surface-sunken: var(--color-plum-950);
+    --surface-overlay: var(--color-plum-850);
+    --surface-inset: oklch(25% 0.042 304);
+
+    /* The handoff specifies hairlines on plum as a white alpha, not a solid. */
+    --border-subtle: oklch(100% 0 0 / 0.07);
+    --border-default: oklch(100% 0 0 / 0.1);
+    --border-strong: oklch(100% 0 0 / 0.18);
+
+    --text-primary: oklch(96.6% 0.009 315);
+    --text-secondary: oklch(61.6% 0.041 306);
+    --text-tertiary: oklch(52% 0.04 305);
+    --text-inverse: var(--color-plum-900);
+
+    --shadow-ambient: 0 1px 2px oklch(0% 0 0 / 0.35), 0 1px 3px oklch(0% 0 0 / 0.25);
+    --shadow-raised: 0 2px 4px oklch(0% 0 0 / 0.35), 0 8px 16px oklch(0% 0 0 / 0.4);
+    --shadow-overlay: 0 12px 24px oklch(0% 0 0 / 0.5), 0 24px 48px oklch(0% 0 0 / 0.45);
+
+    color-scheme: dark;
+  }
+}
+
+/* Expose the semantic tokens as Tailwind utilities (bg-surface, text-fg…). */
+@theme inline {
+  --color-surface: var(--surface-base);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-inset: var(--surface-inset);
+
+  --color-line: var(--border-default);
+  --color-line-subtle: var(--border-subtle);
+  --color-line-strong: var(--border-strong);
+
+  --color-fg: var(--text-primary);
+  --color-fg-muted: var(--text-secondary);
+  --color-fg-subtle: var(--text-tertiary);
+  --color-fg-inverse: var(--text-inverse);
+
+  --shadow-ambient: var(--shadow-ambient);
+  --shadow-raised: var(--shadow-raised);
+  --shadow-overlay: var(--shadow-overlay);
+}
+
+@layer base {
+  * {
+    border-color: var(--border-subtle);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--surface-base);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Focus is never removed, only restyled. Gold reads clearly against both the
+   * plum ground and the violet interactive colour, which makes it the most
+   * legible ring of the two brand accents.
+   */
+  :focus-visible {
+    outline: 2px solid var(--color-gold-500);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background-color: oklch(72.1% 0.1596 300 / 0.28);
+  }
+
+  /* Handoff: tracking -0.03em on display sizes. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: var(--tracking-display);
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Respect the platform-level reduced-motion preference everywhere at once. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Hairline grid used behind the hero and section breaks. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  /* Fades an element out toward its edges; pairs with .bg-grid. */
+  .mask-radial-fade {
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 20%, transparent 75%);
+  }
+
+  /*
+   * Keeps the hero's WebGL scene from competing with the headline.
+   *
+   * The centre of the canvas — where the copy sits — is held at low alpha and
+   * ramps to full toward the edges, so the network reads as ambient texture
+   * behind the text no matter where a node happens to drift. Legibility is a
+   * property of the layout here, not something the animation has to avoid
+   * breaking.
+   */
+  .mask-hero-scene {
+    mask-image: radial-gradient(
+      ellipse 44% 38% at 50% 42%,
+      transparent 0%,
+      rgba(0, 0, 0, 0.08) 52%,
+      rgba(0, 0, 0, 0.7) 78%,
+      black 96%
+    );
+  }
+
+  .mask-b-fade {
+    mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  }
+
+  /*
+   * Hero headline gradient. Runs gold → violet, left to right, mirroring the
+   * mark's own customer→developer reading order.
+   */
+  .text-gradient-brand {
+    background-image: linear-gradient(
+      100deg,
+      var(--color-gold-500) 0%,
+      var(--color-gold-400) 28%,
+      var(--color-accent-400) 62%,
+      var(--color-accent-500) 100%
+    );
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+
+  /* Uppercase mono label, per the handoff's 0.28em tracking. */
+  .label-mono {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: var(--tracking-label);
+    text-transform: uppercase;
+  }
+
+  /* One-pixel top highlight that reads as a light source above the element. */
+  .edge-highlight {
+    position: relative;
+  }
+
+  .edge-highlight::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      oklch(100% 0 0 / 0.14) 25%,
+      oklch(100% 0 0 / 0.14) 75%,
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  .skeleton {
+    background-image: linear-gradient(
+      90deg,
+      var(--surface-inset) 0%,
+      var(--border-strong) 50%,
+      var(--surface-inset) 100%
+    );
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
+  }
+}
+
+@layer utilities {
+  /* Keeps long identifiers (API keys, IDs) from forcing horizontal scroll. */
+  .break-anywhere {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: var(--border-strong);
+    border-radius: 999px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}

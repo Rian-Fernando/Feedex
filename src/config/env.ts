@@ -1,0 +1,107 @@
+import { z } from 'zod';
+
+/**
+ * Server-side environment contract.
+ *
+ * Parsed lazily so that importing this module never throws during a client
+ * bundle pass, and so that build-time steps that do not touch the database
+ * (for example `next build` rendering static marketing pages) do not require a
+ * fully populated environment.
+ */
+const serverSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+
+  /**
+   * Postgres connection string. When omitted, Feedex falls back to an embedded
+   * PGlite database stored under `.data/`, which makes `npm run dev` work with
+   * zero external services. Production must set a real connection string.
+   */
+  DATABASE_URL: z.string().min(1).optional(),
+
+  /**
+   * Directory used by the embedded PGlite database in local development.
+   */
+  PGLITE_DATA_DIR: z.string().min(1).default('.data/feedex'),
+
+  /**
+   * 32+ byte secret used to derive HMACs for API key lookups and to sign
+   * non-session tokens. Required in production.
+   */
+  AUTH_SECRET: z.string().min(32).optional(),
+
+  /**
+   * Canonical origin, used for absolute URLs, cookies, and the widget snippet.
+   */
+  APP_URL: z.string().url().default('http://localhost:3000'),
+
+  /**
+   * When `true`, the /register route is disabled. Useful once the workspace
+   * owner has signed up and the instance should stop accepting new accounts.
+   */
+  DISABLE_SIGNUP: z
+    .string()
+    .optional()
+    .transform((value) => value === 'true'),
+});
+
+export type ServerEnv = z.infer<typeof serverSchema>;
+
+let cached: ServerEnv | null = null;
+
+/**
+ * True while `next build` is running.
+ *
+ * The production requirements below must not apply during the build: a build
+ * machine legitimately has no database credentials, and prerendering a static
+ * page should never depend on them. They are enforced at runtime instead, which
+ * is where a missing value actually matters.
+ */
+function isBuildPhase(): boolean {
+  return process.env.NEXT_PHASE === 'phase-production-build';
+}
+
+function parse(): ServerEnv {
+  const parsed = serverSchema.safeParse(process.env);
+
+  if (!parsed.success) {
+    const issues = parsed.error.issues
+      .map((issue) => `  - ${issue.path.join('.') || '(root)'}: ${issue.message}`)
+      .join('\n');
+    throw new Error(`Invalid environment variables:\n${issues}`);
+  }
+
+  const value = parsed.data;
+
+  if (value.NODE_ENV === 'production' && !isBuildPhase()) {
+    if (!value.DATABASE_URL) {
+      throw new Error('DATABASE_URL is required in production.');
+    }
+    if (!value.AUTH_SECRET) {
+      throw new Error(
+        'AUTH_SECRET is required in production. Generate one with: openssl rand -base64 48',
+      );
+    }
+  }
+
+  return value;
+}
+
+export function env(): ServerEnv {
+  cached ??= parse();
+  return cached;
+}
+
+/**
+ * Development fallback secret. Deterministic so that sessions and API keys
+ * survive a dev-server restart, but never used in production because `parse()`
+ * rejects a missing AUTH_SECRET there.
+ */
+const DEV_SECRET = 'feedex-development-secret-do-not-use-in-production-0000';
+
+export function authSecret(): string {
+  return env().AUTH_SECRET ?? DEV_SECRET;
+}
+
+export function isProduction(): boolean {
+  return env().NODE_ENV === 'production';
+}

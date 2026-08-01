@@ -1,0 +1,30 @@
+:root {
+  /* Brand */
+  --fx-gold: #F7B83D;          /* oklch(0.82 0.15 80)  — the customer's voice */
+  --fx-violet: #B58BF9;        /* oklch(0.72 0.16 300) — the developer's response */
+  --fx-plum: #17101F;          /* page ground / knockout color */
+  --fx-plum-elevated: #1E1529; /* cards, panels on plum */
+  --fx-paper: #F4F1EA;         /* light surface */
+
+  /* Text */
+  --fx-text-on-dark: #F6F2F8;
+  --fx-text-muted-dark: #8B7F99;
+  --fx-text-on-light: #17101F;
+  --fx-text-muted-light: #8D8778;
+
+  /* Lines */
+  --fx-border-dark: rgba(255,255,255,0.10);
+  --fx-border-light: #E3DED2;
+
+  /* Type */
+  --fx-font-display: 'Space Grotesk', system-ui, sans-serif;
+  --fx-font-mono: 'Space Mono', ui-monospace, monospace;
+  --fx-tracking-display: -0.03em;
+  --fx-tracking-label: 0.28em;
+
+  /* Radius */
+  --fx-radius-sm: 6px;
+  --fx-radius-md: 10px;
+  --fx-radius-pill: 999px;
+  --fx-radius-icon: 22%;  /* app icon squircle */
+}

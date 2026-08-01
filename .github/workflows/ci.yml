@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch makes an in-flight run irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Check the widget bundle stays small
+        # The widget runs on other people's pages; a size regression there is a
+        # regression in someone else's product, so it fails the build.
+        run: |
+          SIZE=$(gzip -c public/widget.js | wc -c | tr -d ' ')
+          echo "widget.js: ${SIZE} bytes gzipped"
+          if [ "$SIZE" -gt 12000 ]; then
+            echo "::error::Widget exceeded the 12 kB gzipped budget (${SIZE} bytes)"
+            exit 1
+          fi

@@ -1,0 +1,15 @@
+.next/
+node_modules/
+public/widget.js
+public/*.png
+public/*.ico
+drizzle/
+.data/
+.screenshots/
+coverage/
+
+# Brand assets are canonical design artefacts — kept byte-identical to the
+# handoff so they can be diffed against a future delivery. The README beside
+# them is ours, and is formatted.
+brand/*.svg
+brand/tokens/

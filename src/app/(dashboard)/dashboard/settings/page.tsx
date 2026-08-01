@@ -1,0 +1,126 @@
+import type { Metadata } from 'next';
+import { Database } from 'lucide-react';
+
+import { can, requireWorkspace } from '@/lib/auth';
+import { databaseDriver } from '@/lib/db';
+import { getWorkspace, listMembers } from '@/server/services/workspaces';
+import { PageHeader } from '@/components/dashboard/shell';
+import {
+  AppearanceForm,
+  PasswordForm,
+  ProfileForm,
+  WorkspaceDangerZone,
+  WorkspaceForm,
+} from '@/components/dashboard/settings-forms';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/misc';
+import { formatDate } from '@/lib/format';
+
+export const metadata: Metadata = {
+  title: 'Settings',
+};
+
+export default async function SettingsPage() {
+  const context = await requireWorkspace();
+
+  const [workspace, members] = await Promise.all([
+    getWorkspace(context.workspaceId),
+    listMembers(context.workspaceId),
+  ]);
+
+  const canEditWorkspace = can(context.role, 'workspace.update');
+  const canDeleteWorkspace = can(context.role, 'workspace.delete');
+
+  return (
+    <>
+      <PageHeader title="Settings" description="Your account and this workspace." />
+
+      <Tabs defaultValue="account">
+        <TabsList>
+          <TabsTrigger value="account">Account</TabsTrigger>
+          <TabsTrigger value="workspace">Workspace</TabsTrigger>
+          <TabsTrigger value="members">Members</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="account" className="flex max-w-2xl flex-col gap-4 pt-6">
+          <ProfileForm user={{ name: context.user.name, email: context.user.email }} />
+          <AppearanceForm />
+          <PasswordForm />
+        </TabsContent>
+
+        <TabsContent value="workspace" className="flex max-w-2xl flex-col gap-4 pt-6">
+          <WorkspaceForm
+            name={context.workspaceName}
+            settings={workspace?.settings ?? {}}
+            canEdit={canEditWorkspace}
+          />
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Instance</CardTitle>
+              <CardDescription>How this deployment is configured.</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-3">
+              <dl className="flex flex-col gap-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="flex items-center gap-1.5 text-sm text-fg-subtle">
+                    <Database aria-hidden className="size-3.5" />
+                    Database
+                  </dt>
+                  <dd>
+                    <Badge tone={databaseDriver() === 'postgres' ? 'success' : 'warning'} size="sm">
+                      {databaseDriver() === 'postgres' ? 'PostgreSQL' : 'PGlite (local)'}
+                    </Badge>
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-sm text-fg-subtle">Workspace created</dt>
+                  <dd className="text-sm text-fg-muted">
+                    {workspace ? formatDate(workspace.createdAt) : '—'}
+                  </dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+
+          {canDeleteWorkspace ? (
+            <WorkspaceDangerZone workspaceName={context.workspaceName} />
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="members" className="max-w-2xl pt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Members</CardTitle>
+              <CardDescription>
+                Everyone with access to this workspace. Invitations arrive in a future release — the
+                roles and permissions model is already in place.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-3">
+              <ul className="divide-y divide-line-subtle">
+                {members.map((member) => (
+                  <li key={member.userId} className="flex items-center gap-3 py-3 first:pt-0">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-xs font-semibold text-fg-muted">
+                      {member.name.slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-fg">
+                        {member.name}
+                      </span>
+                      <span className="block truncate text-xs text-fg-subtle">{member.email}</span>
+                    </span>
+                    <Badge tone={member.role === 'owner' ? 'accent' : 'neutral'} size="sm">
+                      {member.role}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </>
+  );
+}

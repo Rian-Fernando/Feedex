@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 132" width="340" height="132" role="img" aria-label="Feedex">
+  <defs>
+    <mask id="fx-lk">
+      <rect width="200" height="132" fill="#fff"></rect>
+      <g fill="none" stroke="#000" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M46 40 H152"></path>
+        <path d="M130 27 L152 40 L130 53"></path>
+        <path d="M154 70 H48"></path>
+        <path d="M70 57 L48 70 L70 83"></path>
+      </g>
+    </mask>
+  </defs>
+  <g mask="url(#fx-lk)">
+    <path d="M100 12 H53 A43 43 0 0 0 53 98 H100 Z" fill="#F7B83D"></path>
+    <polygon points="62,90 36,120 84,99" fill="#F7B83D"></polygon>
+    <path d="M100 12 H147 A43 43 0 0 1 147 98 H100 Z" fill="#B58BF9"></path>
+    <polygon points="138,90 164,120 116,99" fill="#B58BF9"></polygon>
+  </g>
+  <text x="212" y="72" font-family="Space Grotesk, sans-serif" font-size="62" font-weight="600" letter-spacing="-1.9" fill="#F6F2F8">Feedex</text>
+</svg>
