@@ -98,6 +98,19 @@ Feedex.destroy();
 Feedex.version; // "0.1.0"
 ```
 
+### Where submissions are sent
+
+The widget posts to the origin it was served from, discovered from its own
+`<script>` tag. If you boot it with `Feedex.init()` rather than the
+`data-feedex-key` attribute, pass `host` explicitly:
+
+```js
+Feedex.init({ key: 'pk_fdx_...', host: window.location.origin });
+```
+
+Without it a programmatic boot has no tagged script to inspect, and a
+self-hosted instance would post to the hosted one.
+
 ### Your own trigger
 
 Hide the default button and wire your own:

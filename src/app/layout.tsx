@@ -7,6 +7,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 import { siteConfig } from '@/config/site';
 import { ThemeProvider, ThemeScript } from '@/components/theme-provider';
 import { TooltipProvider } from '@/components/ui/misc';
+import { FeedexWidget } from '@/components/feedex-widget';
 import '@/styles/globals.css';
 
 /**
@@ -132,6 +133,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               collect no personal data, so they need no consent banner. They
               load after hydration and never block a paint.
             */}
+            {/* Feedex collecting its own feedback. Renders nothing unless
+                NEXT_PUBLIC_FEEDEX_KEY is set. */}
+            <FeedexWidget />
+
             <Analytics />
             <SpeedInsights />
             <Toaster

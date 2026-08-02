@@ -436,19 +436,34 @@ class FeedexWidget {
   }
 }
 
-/** Origin the widget script itself was served from. */
+/**
+ * Origin the widget script itself was served from.
+ *
+ * Checked in order of reliability. The last of these matters: when the widget
+ * is booted through `Feedex.init()` rather than the `data-feedex-key`
+ * attribute, `document.currentScript` is null and there is no tagged script to
+ * find, so without a `src`-based lookup the origin would silently fall back to
+ * the hosted instance — and a self-hosted or local install would post its
+ * feedback to the wrong server.
+ */
 function scriptOrigin(): string | null {
-  const current =
-    document.currentScript ?? document.querySelector<HTMLScriptElement>('script[data-feedex-key]');
+  const candidates = [
+    document.currentScript,
+    document.querySelector('script[data-feedex-key]'),
+    document.querySelector('script[src*="/widget.js"]'),
+  ];
 
-  const src = current instanceof HTMLScriptElement ? current.src : null;
-  if (!src) return null;
+  for (const candidate of candidates) {
+    if (!(candidate instanceof HTMLScriptElement) || !candidate.src) continue;
 
-  try {
-    return new URL(src).origin;
-  } catch {
-    return null;
+    try {
+      return new URL(candidate.src, window.location.href).origin;
+    } catch {
+      // Malformed src; try the next candidate.
+    }
   }
+
+  return null;
 }
 
 /** Reads configuration from `data-feedex-*` attributes on the script tag. */

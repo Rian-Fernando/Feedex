@@ -158,6 +158,10 @@ For production, set `DATABASE_URL` to a real PostgreSQL instance and run
 | `npm run widget:build` | Bundle the widget to `public/widget.js`         |
 | `npm run og:generate`  | Regenerate the OG card and favicons             |
 
+Feedex collects its own feedback through its own widget. Set
+`NEXT_PUBLIC_FEEDEX_KEY` to a project's public key and the widget appears
+site-wide; leave it unset — the default — and nothing renders.
+
 ## Tech stack
 
 | Layer          | Choice                                 | Why                                                                                                                 |
