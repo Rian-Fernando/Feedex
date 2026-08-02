@@ -4,6 +4,7 @@ import { notFound, redirect } from 'next/navigation';
 import { env } from '@/config/env';
 import { currentUser } from '@/lib/auth';
 import { RegisterForm } from '@/components/auth/auth-forms';
+import { enabledProviders } from '@/lib/auth/oauth';
 
 // Reads the session cookie to bounce already-authenticated visitors.
 export const dynamic = 'force-dynamic';
@@ -18,5 +19,5 @@ export default async function RegisterPage() {
   if (env().DISABLE_SIGNUP) notFound();
   if (await currentUser()) redirect('/dashboard');
 
-  return <RegisterForm />;
+  return <RegisterForm providers={enabledProviders()} />;
 }

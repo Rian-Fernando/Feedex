@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 
 import { currentUser } from '@/lib/auth';
 import { LoginForm } from '@/components/auth/auth-forms';
+import { enabledProviders } from '@/lib/auth/oauth';
 import { Skeleton } from '@/components/ui/misc';
 
 // Reads the session cookie to bounce already-authenticated visitors.
@@ -21,7 +22,7 @@ export default async function LoginPage() {
   return (
     // `useSearchParams` in the form requires a Suspense boundary above it.
     <Suspense fallback={<Skeleton className="h-80 w-full" />}>
-      <LoginForm />
+      <LoginForm providers={enabledProviders()} />
     </Suspense>
   );
 }

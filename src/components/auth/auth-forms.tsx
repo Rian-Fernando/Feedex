@@ -8,6 +8,7 @@ import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Field, FieldLabel, Input } from '@/components/ui/field';
 import { loginAction, registerAction } from '@/server/actions/auth';
+import { ProviderButtons } from './provider-buttons';
 import type { ActionResult } from '@/lib/errors';
 
 /**
@@ -35,10 +36,16 @@ function FormError({ message }: { message?: string }) {
 
 const INITIAL: ActionResult = { ok: false };
 
-export function LoginForm() {
+export function LoginForm({
+  providers = [],
+}: {
+  providers?: Array<{ id: string; label: string }>;
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get('next');
+  // The OAuth callback redirects here with a readable reason on failure.
+  const providerError = params.get('error');
 
   const [state, formAction, pending] = React.useActionState(loginAction, INITIAL);
 
@@ -57,6 +64,11 @@ export function LoginForm() {
         <h1 className="text-2xl font-semibold tracking-tight text-fg">Welcome back</h1>
         <p className="text-sm text-fg-muted">Sign in to your Feedex workspace.</p>
       </div>
+
+      {/* The OAuth callback redirects here with a readable reason on failure. */}
+      <FormError message={providerError ?? undefined} />
+
+      <ProviderButtons providers={providers} next={next ?? undefined} />
 
       <form action={formAction} className="flex flex-col gap-4">
         <FormError message={state.code !== 'validation_error' ? state.error : undefined} />
@@ -104,7 +116,11 @@ export function LoginForm() {
   );
 }
 
-export function RegisterForm() {
+export function RegisterForm({
+  providers = [],
+}: {
+  providers?: Array<{ id: string; label: string }>;
+}) {
   const router = useRouter();
   const [state, formAction, pending] = React.useActionState(registerAction, INITIAL);
 
@@ -123,6 +139,8 @@ export function RegisterForm() {
           Start collecting feedback from every project in one place.
         </p>
       </div>
+
+      <ProviderButtons providers={providers} verb="Sign up with" />
 
       <form action={formAction} className="flex flex-col gap-4">
         <FormError message={state.code !== 'validation_error' ? state.error : undefined} />

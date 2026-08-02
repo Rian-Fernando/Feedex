@@ -79,6 +79,7 @@ Full notes in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
   are stored only as HMAC digests and shown exactly once. Both rotate in place.
 - **Settings** — profile, password, appearance, workspace defaults, members, and
   the danger zone.
+- **Sign-in** — email and password, plus Google and GitHub when configured.
 
 ## Install the widget
 
@@ -176,6 +177,10 @@ For production, set `DATABASE_URL` to a real PostgreSQL instance and run
 
 - Passwords: scrypt (N=2^16, r=8, p=1), per-password salt, parameters stored in
   the hash so they can be raised later.
+- OAuth: Google and GitHub, both optional. State cookies on every flow, PKCE
+  where the provider supports it, and account linking only on a provider-verified
+  email — so registering elsewhere with someone's address cannot take over their
+  workspace.
 - Sessions: 256-bit opaque tokens in `httpOnly`, `SameSite=Lax` cookies; only the
   SHA-256 is stored, so a database snapshot cannot be replayed as a login.
 - Secret API keys: stored as HMAC digests keyed by `AUTH_SECRET`.

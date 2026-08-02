@@ -1,13 +1,14 @@
 import 'server-only';
 
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import { getDb, type Database } from '@/lib/db';
-import { users, type User } from '@/lib/db/schema';
+import { accounts, users, type User } from '@/lib/db/schema';
 import { createId, ID_PREFIX } from '@/lib/ids';
 import { AppError } from '@/lib/errors';
 import { fakeVerify, hashPassword, verifyPassword } from '@/lib/auth/password';
 import type { RegisterInput } from '@/lib/validation';
+import type { OAuthProfile, TokenSet } from '@/lib/auth/oauth';
 import { createWorkspace } from './workspaces';
 
 /**
@@ -164,4 +165,172 @@ export async function hasAnyUser(): Promise<boolean> {
   const db = await getDb();
   const rows = await db.select({ id: users.id }).from(users).limit(1);
   return rows.length > 0;
+}
+
+/* ------------------------------ OAuth sign-in ----------------------------- */
+
+/**
+ * Signs in (or signs up) through an external provider.
+ *
+ * Three cases, in order:
+ *
+ *   1. The provider account is already linked → sign that user in.
+ *   2. No link, but a user exists with the same email → link them, *only* if
+ *      the provider asserts the email is verified. Without that check, signing
+ *      up at a provider with someone else's address would take over their
+ *      workspace.
+ *   3. Otherwise → create a user and their first workspace, exactly as
+ *      password registration does.
+ *
+ * The result is an ordinary session either way; nothing downstream knows or
+ * cares which strategy produced it.
+ */
+export async function signInWithProvider(input: {
+  provider: string;
+  profile: OAuthProfile;
+  tokens: TokenSet;
+}): Promise<{ user: User; created: boolean }> {
+  const db = await getDb();
+  const { provider, profile, tokens } = input;
+
+  const linked = await db
+    .select({ user: users })
+    .from(accounts)
+    .innerJoin(users, eq(accounts.userId, users.id))
+    .where(
+      and(
+        eq(accounts.provider, provider),
+        eq(accounts.providerAccountId, profile.providerAccountId),
+      ),
+    )
+    .limit(1);
+
+  const existingLink = linked[0];
+
+  if (existingLink) {
+    await db
+      .update(accounts)
+      .set({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresAt: tokens.expiresAt,
+        scope: tokens.scope,
+      })
+      .where(
+        and(
+          eq(accounts.provider, provider),
+          eq(accounts.providerAccountId, profile.providerAccountId),
+        ),
+      );
+
+    return { user: existingLink.user, created: false };
+  }
+
+  const byEmail = await findUserByEmail(profile.email);
+
+  if (byEmail) {
+    if (!profile.emailVerified) {
+      throw AppError.forbidden(
+        'An account already exists with that email. Sign in with your password first, or verify your email with the provider.',
+      );
+    }
+
+    await db.insert(accounts).values({
+      userId: byEmail.id,
+      provider,
+      providerAccountId: profile.providerAccountId,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresAt: tokens.expiresAt,
+      scope: tokens.scope,
+    });
+
+    // Fill in an avatar if the account never had one.
+    if (!byEmail.avatarUrl && profile.avatarUrl) {
+      await db
+        .update(users)
+        .set({ avatarUrl: profile.avatarUrl, updatedAt: new Date() })
+        .where(eq(users.id, byEmail.id));
+    }
+
+    return { user: byEmail, created: false };
+  }
+
+  // New account. `password_hash` stays null — this user signs in only through
+  // the provider until they set a password.
+  const userId = createId(ID_PREFIX.user);
+
+  const user = await db.transaction(async (tx) => {
+    const inserted = await tx
+      .insert(users)
+      .values({
+        id: userId,
+        email: profile.email,
+        name: profile.name,
+        passwordHash: null,
+        avatarUrl: profile.avatarUrl,
+        emailVerifiedAt: profile.emailVerified ? new Date() : null,
+        preferences: { theme: 'system' },
+      })
+      .returning();
+
+    const created = inserted[0];
+    if (!created) throw new Error('Failed to create user.');
+
+    await tx.insert(accounts).values({
+      userId: created.id,
+      provider,
+      providerAccountId: profile.providerAccountId,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresAt: tokens.expiresAt,
+      scope: tokens.scope,
+    });
+
+    await createWorkspace(
+      { name: defaultWorkspaceName(created.name), ownerId: created.id },
+      tx as unknown as Database,
+    );
+
+    return created;
+  });
+
+  return { user, created: true };
+}
+
+/** External identities linked to an account, for the settings page. */
+export async function listLinkedAccounts(
+  userId: string,
+): Promise<Array<{ provider: string; createdAt: Date }>> {
+  const db = await getDb();
+
+  return db
+    .select({ provider: accounts.provider, createdAt: accounts.createdAt })
+    .from(accounts)
+    .where(eq(accounts.userId, userId));
+}
+
+/** Whether this account can still sign in without the given provider. */
+export async function canUnlinkProvider(userId: string, provider: string): Promise<boolean> {
+  const db = await getDb();
+
+  const rows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (rows[0]?.passwordHash) return true;
+
+  const linked = await listLinkedAccounts(userId);
+  return linked.filter((entry) => entry.provider !== provider).length > 0;
+}
+
+/** Removes a provider link, refusing to strip the last way in. */
+export async function unlinkProvider(userId: string, provider: string): Promise<void> {
+  if (!(await canUnlinkProvider(userId, provider))) {
+    throw AppError.validation(
+      'That is the only way to sign in to this account. Set a password first.',
+    );
+  }
+
+  const db = await getDb();
+  await db
+    .delete(accounts)
+    .where(and(eq(accounts.userId, userId), eq(accounts.provider, provider)));
 }

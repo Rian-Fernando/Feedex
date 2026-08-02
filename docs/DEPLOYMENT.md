@@ -340,3 +340,190 @@ installed.
 | Widget gets a CORS error                | Project domain does not match the host    | Clear the project's Domain field, or set it to the right host |
 | Sessions drop on every request          | `APP_URL` scheme is `http` in production  | Set it to the `https://` origin                               |
 | Secret keys stop validating             | `AUTH_SECRET` changed                     | Rotate the secret keys from the dashboard                     |
+
+---
+
+## Appendix A — Neon, step by step
+
+The database walkthrough referenced in Part 1, in full.
+
+### 1. Create it from inside Vercel
+
+1. Vercel dashboard → your **Feedex** project → **Storage** tab.
+2. **Create Database** → **Neon** → **Continue**.
+3. Region: pick the one nearest your users. `us-east-1` (Washington) pairs with
+   Vercel's default `iad1` and keeps query latency in single-digit
+   milliseconds.
+4. Name it `feedex-db`.
+5. **Create**, then **Connect** it to the Feedex project, with all three
+   environments (Production, Preview, Development) ticked.
+
+Vercel now injects `DATABASE_URL` — plus a few `POSTGRES_*` aliases Feedex does
+not use — into the project. You do not need to copy anything by hand.
+
+### 2. Confirm the connection string
+
+Vercel → **Settings** → **Environment Variables** → `DATABASE_URL`. It looks
+like:
+
+```
+postgresql://neondb_owner:PASSWORD@ep-something-123456-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require
+```
+
+Note the `-pooler` in the host. That is the pooled endpoint, which is the right
+one for serverless functions — each invocation opens its own connection, and
+the pooler is what stops that exhausting the database's connection limit.
+
+### 3. Run the migrations
+
+Once, from your machine, against the production database:
+
+```bash
+DATABASE_URL="postgresql://neondb_owner:...-pooler...neon.tech/neondb?sslmode=require" \
+  npm run db:migrate
+```
+
+Expected output:
+
+```
+[migrate] driver: postgres
+[migrate] up to date
+```
+
+Copy the string from Vercel exactly, quotes included — it contains `?` and `&`,
+which your shell will otherwise interpret.
+
+### 4. Verify
+
+```bash
+curl -s https://feedex.rianfernando.com/api/health
+```
+
+```json
+{ "status": "ok", "driver": "postgres", "latencyMs": 12, "timestamp": "..." }
+```
+
+`"driver": "postgres"` is the thing to check. If it says `pglite`, the runtime
+never saw `DATABASE_URL` — confirm it is set for **Production** and redeploy.
+
+### 5. Create your account
+
+Visit `/register`, sign up, then set `DISABLE_SIGNUP=true` in Vercel and
+redeploy so the instance stops accepting new registrations.
+
+### Notes
+
+- **Free tier**: 0.5 GB storage, which at roughly 2 kB per feedback item is on
+  the order of a quarter of a million reports.
+- **Scale to zero**: Neon suspends an idle database after five minutes. The
+  first request afterwards pays a cold start of a few hundred milliseconds.
+- **Backups**: Neon keeps point-in-time restore. Check the retention window in
+  its dashboard — it is typically 7 days on the free plan.
+- **Later migrations**: after editing `src/lib/db/schema.ts`, run
+  `npm run db:generate`, commit the SQL in `drizzle/`, and run `db:migrate`
+  against production with the same command as above.
+
+---
+
+## Appendix B — Google and GitHub sign-in
+
+Both are optional and independent. A provider without **both** an id and a
+secret configured simply does not appear on the sign-in page.
+
+### Google
+
+1. [Google Cloud Console](https://console.cloud.google.com/) → create a project
+   (or pick an existing one).
+2. **APIs & Services** → **OAuth consent screen**:
+   - User type: **External**
+   - App name: `Feedex`
+   - Support email and developer contact: your address
+   - Authorised domain: `rianfernando.com`
+   - Scopes: the defaults are enough. Feedex asks only for
+     `openid email profile`.
+   - While the app is in **Testing**, only accounts on the test-users list can
+     sign in. **Publish** it once you are happy. With only these three scopes
+     Google does not require a verification review.
+3. **Credentials** → **Create credentials** → **OAuth client ID**:
+   - Application type: **Web application**
+   - Name: `Feedex web`
+   - **Authorised JavaScript origins**:
+     ```
+     http://localhost:3000
+     https://feedex.rianfernando.com
+     ```
+   - **Authorised redirect URIs**:
+     ```
+     http://localhost:3000/api/auth/google/callback
+     https://feedex.rianfernando.com/api/auth/google/callback
+     ```
+4. Copy the client ID and secret into Vercel as `GOOGLE_CLIENT_ID` and
+   `GOOGLE_CLIENT_SECRET`, then redeploy.
+
+The redirect URI must match **exactly** — scheme, host, port, path, no trailing
+slash. A mismatch produces Google's `redirect_uri_mismatch` error, which is by
+far the most common thing to get wrong here.
+
+### GitHub
+
+1. GitHub → **Settings** → **Developer settings** → **OAuth Apps** → **New
+   OAuth App**.
+2. Fill in:
+   - Application name: `Feedex`
+   - Homepage URL: `https://feedex.rianfernando.com`
+   - Authorization callback URL:
+     `https://feedex.rianfernando.com/api/auth/github/callback`
+3. **Register application**, then **Generate a new client secret**. The secret
+   is shown once.
+4. Copy both into Vercel as `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`, then
+   redeploy.
+
+A GitHub OAuth App accepts only one callback URL. For local development,
+register a second app (`Feedex dev`) pointing at
+`http://localhost:3000/api/auth/github/callback` and use its credentials in
+`.env.local`.
+
+### How accounts are matched
+
+When someone signs in with a provider, Feedex resolves them in this order:
+
+1. **The provider account is already linked** → sign that user in.
+2. **No link, but a user exists with the same email** → link them, _only if the
+   provider says the email is verified_. Without that condition, registering at
+   a provider with someone else's address would take over their workspace.
+3. **Otherwise** → create the user and their first workspace, exactly as
+   password registration does.
+
+So an account created with a password can later sign in with Google, and the
+same person arriving via Google and GitHub ends up as one account rather than
+two — provided the email is verified at both.
+
+Users created through a provider have no password. They can set one from
+**Settings → Account** to gain a second way in; Feedex refuses to unlink the
+last remaining sign-in method.
+
+### Testing locally
+
+```bash
+# .env.local
+GITHUB_CLIENT_ID=...
+GITHUB_CLIENT_SECRET=...
+```
+
+```bash
+npm run dev
+```
+
+The buttons appear on `/login` and `/register` as soon as both values are
+present. No restart beyond the dev server is needed.
+
+### Troubleshooting
+
+| Symptom                              | Cause                                                                                                 |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `redirect_uri_mismatch`              | The registered URI differs from `APP_URL` + `/api/auth/<provider>/callback`. They must match exactly. |
+| Buttons do not appear                | One of the pair is missing, or the deploy predates the variables being set.                           |
+| "That sign-in link has expired"      | The state cookie is older than ten minutes, or was dropped. Start again.                              |
+| "That sign-in could not be verified" | The `state` did not match — usually a stale tab. Start again.                                         |
+| GitHub: "no verified email address"  | The GitHub account has no verified address. Add one in GitHub's email settings.                       |
+| Sign-up blocked                      | `DISABLE_SIGNUP=true` also blocks first-time provider sign-up, by design.                             |

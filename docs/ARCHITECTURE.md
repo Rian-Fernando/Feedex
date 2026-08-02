@@ -184,6 +184,23 @@ external identity links, so adding a provider means adding a
 `signInWithProvider` function beside the existing ones — not reshaping the
 identity model.
 
+### OAuth
+
+Google and GitHub are implemented directly against the providers rather than
+through a framework. The flow is small — an authorization redirect, a code
+exchange, one profile request — and doing it in-house keeps the session model
+unchanged: a provider sign-in ends in exactly the same opaque, database-backed
+session a password produces, so nothing downstream knows which strategy was
+used.
+
+| Concern             | Approach                                                                                                                     |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| CSRF                | A random `state` in a ten-minute httpOnly cookie, checked on return                                                          |
+| Code interception   | PKCE (S256) for Google; GitHub does not document support, where `state` carries the flow                                     |
+| Account linking     | Only on a provider-_verified_ email — otherwise registering elsewhere with someone's address would take over their workspace |
+| Provider-only users | `password_hash` stays null; they can set one later, and the last sign-in method cannot be unlinked                           |
+| Not configured      | A provider missing either credential is absent from the sign-in page entirely                                                |
+
 **What this costs:** no MFA, no magic links, no password reset flow yet. Those
 are roadmap items, and each is additive.
 

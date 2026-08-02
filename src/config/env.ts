@@ -35,6 +35,16 @@ const serverSchema = z.object({
   APP_URL: z.string().url().default('http://localhost:3000'),
 
   /**
+   * OAuth provider credentials. All optional: a provider without both values
+   * is simply absent from the sign-in page, so an instance can run with
+   * passwords only, with one provider, or with both.
+   */
+  GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+  GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+  GITHUB_CLIENT_ID: z.string().min(1).optional(),
+  GITHUB_CLIENT_SECRET: z.string().min(1).optional(),
+
+  /**
    * When `true`, the /register route is disabled. Useful once the workspace
    * owner has signed up and the instance should stop accepting new accounts.
    */

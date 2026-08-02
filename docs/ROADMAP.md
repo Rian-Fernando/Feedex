@@ -16,7 +16,7 @@ requires reshaping the data model.
 - Internal notes and an activity timeline
 - Public and secret API keys, rotatable
 - REST read API with rate limit headers
-- Credentials auth with database-backed sessions
+- Credentials auth with database-backed sessions, plus Google and GitHub OAuth
 - Light and dark themes
 - SEO and GEO: sitemap, robots, JSON-LD, `llms.txt`, OG card
 
