@@ -1,7 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import { motion, useReducedMotion, type HTMLMotionProps, type Variants } from 'motion/react';
+import {
+  motion,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+  type HTMLMotionProps,
+  type Variants,
+} from 'motion/react';
 
 import { cn } from '@/lib/cn';
 
@@ -107,6 +114,87 @@ export function RevealItem({
           transition: { duration: reduced ? 0 : 0.65, ease: EASE },
         },
       }}
+      className={cn(className)}
+      {...props}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/**
+ * Scroll-linked parallax.
+ *
+ * Moves its content at a slightly different rate to the page as it passes
+ * through the viewport. Used on section headings and feature panels so the
+ * whole page has depth while scrolling, not just the hero.
+ *
+ * `speed` is the fraction of the element's own travel to offset by: positive
+ * lags behind the scroll, negative runs ahead of it.
+ */
+export interface ParallaxProps extends Omit<HTMLMotionProps<'div'>, 'style'> {
+  speed?: number;
+  /** Fades in over the first part of the pass, in addition to moving. */
+  fade?: boolean;
+}
+
+export function Parallax({
+  children,
+  className,
+  speed = 0.12,
+  fade = false,
+  ...props
+}: ParallaxProps) {
+  const reduced = useReducedMotion();
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ['start end', 'end start'],
+  });
+
+  const y = useTransform(scrollYProgress, [0, 1], [`${speed * 100}%`, `${-speed * 100}%`]);
+  const opacity = useTransform(scrollYProgress, [0, 0.22, 0.85, 1], [0.35, 1, 1, 0.5]);
+
+  return (
+    <motion.div
+      ref={ref}
+      style={reduced ? undefined : { y, ...(fade ? { opacity } : {}) }}
+      className={cn(className)}
+      {...props}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/**
+ * A section whose content scales and fades slightly as it enters and leaves.
+ *
+ * Subtler than the hero's pinned sequence, but applied across every section it
+ * is what makes the page feel continuous rather than a stack of static blocks.
+ */
+export function ScrollScale({
+  children,
+  className,
+  ...props
+}: Omit<HTMLMotionProps<'div'>, 'style'>) {
+  const reduced = useReducedMotion();
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ['start end', 'center center'],
+  });
+
+  const scale = useTransform(scrollYProgress, [0, 1], [0.94, 1]);
+  const opacity = useTransform(scrollYProgress, [0, 0.55, 1], [0, 0.85, 1]);
+  const y = useTransform(scrollYProgress, [0, 1], ['3rem', '0rem']);
+
+  return (
+    <motion.div
+      ref={ref}
+      style={reduced ? undefined : { scale, opacity, y }}
       className={cn(className)}
       {...props}
     >

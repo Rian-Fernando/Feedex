@@ -21,7 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { GithubIcon } from '@/components/brand/github-icon';
-import { Reveal, RevealGroup, RevealItem } from './reveal';
+import { Parallax, Reveal, RevealGroup, RevealItem, ScrollScale } from './reveal';
 import { siteConfig } from '@/config/site';
 
 /** Consistent section wrapper: one max width, one rhythm, one heading shape. */
@@ -45,7 +45,10 @@ export function Section({
   return (
     <section id={id} className={cn('px-6 py-20 sm:py-28', className)}>
       <div className="mx-auto max-w-6xl">
-        <Reveal className={cn('max-w-2xl', align === 'center' && 'mx-auto text-center')}>
+        <Parallax
+          speed={0.07}
+          className={cn('max-w-2xl', align === 'center' && 'mx-auto text-center')}
+        >
           {eyebrow ? (
             <p className="text-xs font-semibold tracking-[0.12em] text-accent-500 uppercase">
               {eyebrow}
@@ -55,7 +58,7 @@ export function Section({
             {title}
           </h2>
           {description ? <p className="mt-3 leading-relaxed text-fg-muted">{description}</p> : null}
-        </Reveal>
+        </Parallax>
         {children ? <div className="mt-12">{children}</div> : null}
       </div>
     </section>
@@ -207,7 +210,7 @@ export function Developers() {
           </div>
         </Reveal>
 
-        <Reveal delay={0.1} className="min-w-0">
+        <Parallax speed={-0.09} className="min-w-0">
           <div className="edge-highlight overflow-hidden rounded-xl border border-line bg-surface-raised shadow-raised">
             <div className="flex items-center gap-2 border-b border-line-subtle px-4 py-2.5">
               <Terminal aria-hidden className="size-3.5 text-fg-subtle" />
@@ -222,7 +225,7 @@ export function Developers() {
               </code>
             </pre>
           </div>
-        </Reveal>
+        </Parallax>
       </div>
     </section>
   );
@@ -397,7 +400,7 @@ export function Faq() {
 export function CallToAction() {
   return (
     <section className="px-6 py-20 sm:py-28">
-      <Reveal className="mx-auto max-w-4xl">
+      <ScrollScale className="mx-auto max-w-4xl">
         <div className="relative isolate overflow-hidden rounded-2xl border border-line bg-surface-raised px-6 py-14 text-center sm:px-12">
           <div
             aria-hidden
@@ -431,7 +434,7 @@ export function CallToAction() {
             </Button>
           </div>
         </div>
-      </Reveal>
+      </ScrollScale>
     </section>
   );
 }

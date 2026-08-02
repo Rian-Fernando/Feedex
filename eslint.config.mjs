@@ -41,6 +41,21 @@ const config = [
     },
   },
   {
+    /*
+      react-three-fiber's contract is imperative: `useFrame` runs once per
+      frame and animates by mutating scene objects in place. Routing that
+      through React state would re-render the tree sixty times a second, which
+      is the opposite of the intent.
+
+      The immutability rule models React state, not a retained-mode scene
+      graph, so it is disabled here — and only here.
+    */
+    files: ['src/components/three/**/*.tsx'],
+    rules: {
+      'react-hooks/immutability': 'off',
+    },
+  },
+  {
     // Scripts are CLI tools; printing is the point.
     files: ['scripts/**/*.{ts,mjs}'],
     rules: {

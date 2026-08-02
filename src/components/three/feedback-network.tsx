@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { usePrefersReducedMotion } from '@/lib/use-media-query';
 import { useTheme } from '@/components/theme-provider';
 import { NetworkFallback } from './network-fallback';
+import { scrollState, smoothstep, useScrollProgress } from '@/lib/scroll-progress';
 
 /**
  * Hero scene: feedback in flight.
@@ -173,14 +174,28 @@ function ProjectWindow({
 
   useFrame(({ clock }) => {
     const group = groupRef.current;
-    if (!group || reducedMotion) return;
+    if (!group) return;
+
+    // Scroll draws the windows toward the hub. This is the product's whole
+    // claim rendered as motion: separate projects converging into one place.
+    const converge = smoothstep(0.05, 0.85, scrollState.narrative);
+    const base = spec.position.clone().lerp(HUB, converge * 0.72);
+
+    if (reducedMotion) {
+      group.position.copy(base);
+      return;
+    }
 
     const t = clock.getElapsedTime();
-    // Slow float with a slight roll — alive, without pulling the eye off the
-    // headline.
-    group.position.y = spec.position.y + Math.sin(t * 0.55 + spec.phase) * 0.24;
-    group.position.x = spec.position.x + Math.cos(t * 0.36 + spec.phase) * 0.13;
-    group.rotation.z = spec.rotation[2] + Math.sin(t * 0.42 + spec.phase) * 0.04;
+    // Float amplitude decays as they converge, so the arrival settles.
+    const drift = 1 - converge * 0.8;
+    group.position.set(
+      base.x + Math.cos(t * 0.36 + spec.phase) * 0.13 * drift,
+      base.y + Math.sin(t * 0.55 + spec.phase) * 0.24 * drift,
+      base.z,
+    );
+    group.rotation.z = spec.rotation[2] + Math.sin(t * 0.42 + spec.phase) * 0.04 * drift;
+    group.scale.setScalar(spec.scale * (1 - converge * 0.42));
   });
 
   return (
@@ -290,7 +305,9 @@ function Messages({ dark, reducedMotion }: { dark: boolean; reducedMotion: boole
         for (let i = 0; i < MESSAGES_PER_PATH; i += 1) {
           const index = pathIndex * MESSAGES_PER_PATH + i;
           const offset = i / MESSAGES_PER_PATH + pathIndex * 0.13;
-          const progress = (time * 0.19 + offset) % 1;
+          // Traffic intensifies as the windows converge.
+          const rush = 1 + smoothstep(0.1, 0.9, scrollState.narrative) * 1.6;
+          const progress = (time * 0.19 * rush + offset) % 1;
 
           dummy.position.copy(path.getPoint(progress));
 
@@ -339,17 +356,25 @@ function Hub({ dark, reducedMotion }: { dark: boolean; reducedMotion: boolean })
   const ring2Ref = React.useRef<THREE.Mesh>(null);
   const glowRef = React.useRef<THREE.Mesh>(null);
 
+  const groupRef = React.useRef<THREE.Group>(null);
+
   useFrame(({ clock }) => {
+    // The hub swells as the windows land — the dashboard filling up.
+    const arrive = smoothstep(0.15, 0.95, scrollState.narrative);
+    if (groupRef.current) groupRef.current.scale.setScalar(1 + arrive * 0.85);
+
     if (reducedMotion) return;
     const t = clock.getElapsedTime();
 
-    if (ringRef.current) ringRef.current.rotation.z = t * 0.34;
-    if (ring2Ref.current) ring2Ref.current.rotation.z = -t * 0.22;
-    if (glowRef.current) glowRef.current.scale.setScalar(1 + Math.sin(t * 1.5) * 0.15);
+    if (ringRef.current) ringRef.current.rotation.z = t * (0.34 + arrive * 0.5);
+    if (ring2Ref.current) ring2Ref.current.rotation.z = -t * (0.22 + arrive * 0.4);
+    if (glowRef.current) {
+      glowRef.current.scale.setScalar(1 + Math.sin(t * 1.5) * 0.15 + arrive * 0.5);
+    }
   });
 
   return (
-    <group position={HUB}>
+    <group ref={groupRef} position={HUB}>
       <mesh ref={glowRef}>
         <circleGeometry args={[0.95, 48]} />
         <meshBasicMaterial
@@ -420,20 +445,35 @@ function Depth({ dark }: { dark: boolean }) {
 /** Cinematic drift plus pointer parallax, applied to the whole composition. */
 function Scene({ dark, reducedMotion }: { dark: boolean; reducedMotion: boolean }) {
   const groupRef = React.useRef<THREE.Group>(null);
-  const { viewport } = useThree();
+  const { viewport, camera, invalidate } = useThree();
+
+  // With the loop stopped under reduced motion, scrolling still has to repaint,
+  // otherwise the convergence would never be seen at all.
+  React.useEffect(() => {
+    if (!reducedMotion) return;
+    const onScroll = () => invalidate();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [reducedMotion, invalidate]);
 
   useFrame(({ clock, pointer }) => {
     const group = groupRef.current;
     if (!group) return;
 
+    // A slow dolly forward, so the scene deepens rather than merely moving.
+    const target = 9.6 - smoothstep(0, 1, scrollState.narrative) * 2.6;
+    camera.position.z += (target - camera.position.z) * (reducedMotion ? 1 : 0.06);
+
     if (reducedMotion) {
-      group.rotation.set(0, 0, 0);
+      group.rotation.set(0, scrollState.narrative * 0.34, 0);
       return;
     }
 
     const t = clock.getElapsedTime();
-    const targetY = pointer.x * 0.13 + Math.sin(t * 0.16) * 0.075;
-    const targetX = -pointer.y * 0.09 + Math.cos(t * 0.13) * 0.045;
+    const progress = scrollState.narrative;
+
+    const targetY = pointer.x * 0.13 + Math.sin(t * 0.16) * 0.075 + progress * 0.34;
+    const targetX = -pointer.y * 0.09 + Math.cos(t * 0.13) * 0.045 - progress * 0.2;
 
     // Eased toward the target so the view trails the pointer rather than
     // snapping to it — the difference between cinematic and twitchy.
@@ -502,6 +542,7 @@ function subscribeToNothing(): () => void {
 }
 
 export function FeedbackNetwork({ className }: { className?: string }) {
+  useScrollProgress();
   const reducedMotion = usePrefersReducedMotion();
   const { resolved } = useTheme();
   const dark = resolved === 'dark';
