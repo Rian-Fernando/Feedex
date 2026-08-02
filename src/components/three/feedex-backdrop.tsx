@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from 'react';
 
-import { useTheme } from '@/components/theme-provider';
 import {
   usePageVisible,
   usePrefersReducedMotion,
@@ -28,8 +27,6 @@ const STILL_FRAME = 0.7;
  * and its postprocessing passes stay out of the initial bundle either way.
  */
 export function FeedexBackdrop() {
-  const { resolved } = useTheme();
-
   // Environment, read as external state so the first client render is already
   // correct rather than defaulting and then correcting a frame later.
   const webgl = useWebGLSupport();
@@ -38,7 +35,6 @@ export function FeedexBackdrop() {
   const visible = usePageVisible();
 
   const animate = !reduced;
-  const dark = resolved === 'dark';
 
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneHandle | null>(null);
@@ -47,7 +43,7 @@ export function FeedexBackdrop() {
 
   // Build and tear down the scene.
   useEffect(() => {
-    if (!webgl || !dark) return;
+    if (!webgl) return;
 
     const mount = mountRef.current;
     if (!mount) return;
@@ -67,7 +63,7 @@ export function FeedexBackdrop() {
       sceneRef.current?.dispose();
       sceneRef.current = null;
     };
-  }, [webgl, dark, animate, quality]);
+  }, [webgl, animate, quality]);
 
   // Stop the loop while the tab is hidden.
   useEffect(() => {
@@ -81,7 +77,7 @@ export function FeedexBackdrop() {
    * the last beat lands on the last screen of the page.
    */
   useEffect(() => {
-    if (!webgl || !dark) return;
+    if (!webgl) return;
 
     if (reduced) {
       progressRef.current = STILL_FRAME;
@@ -112,11 +108,11 @@ export function FeedexBackdrop() {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
     };
-  }, [webgl, dark, reduced]);
+  }, [webgl, reduced]);
 
   // Subtle parallax so the scene reads as a physical space.
   useEffect(() => {
-    if (!webgl || !dark || !animate || quality === 'low') return;
+    if (!webgl || !animate || quality === 'low') return;
 
     const onMove = (event: PointerEvent) => {
       pointerRef.current = {
@@ -127,16 +123,13 @@ export function FeedexBackdrop() {
 
     window.addEventListener('pointermove', onMove, { passive: true });
     return () => window.removeEventListener('pointermove', onMove);
-  }, [webgl, dark, animate, quality]);
-
-  // The scene's ground, fog, and lighting are all plum. On the paper theme it
-  // would fight the page rather than sit behind it, so the light variant is a
-  // clean, quiet page instead of a recoloured scene.
-  if (!webgl || !dark) return null;
+  }, [webgl, animate, quality]);
 
   return (
-    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10">
-      <div ref={mountRef} className="absolute inset-0" />
+    // The ground is painted here rather than on the page wrapper, so it exists
+    // whether or not the canvas ever mounts.
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 bg-plum-900">
+      {webgl ? <div ref={mountRef} className="absolute inset-0" /> : null}
 
       {/*
         One constant scrim rather than a ramp. The story now runs the whole

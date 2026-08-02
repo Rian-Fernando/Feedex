@@ -8,7 +8,6 @@ import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Logo } from '@/components/brand/logo';
 import { Button } from '@/components/ui/button';
-import { ThemeToggle } from '@/components/dashboard/theme-toggle';
 
 const LINKS = [
   { href: '#features', label: 'Features' },
@@ -67,8 +66,6 @@ export function MarketingNav({ authenticated }: { authenticated: boolean }) {
         </ul>
 
         <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1 sm:gap-1.5">
-          <ThemeToggle />
-
           {authenticated ? (
             <Button asChild size="sm">
               <Link href="/dashboard">Dashboard</Link>
