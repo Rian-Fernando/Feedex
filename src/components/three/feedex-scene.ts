@@ -301,15 +301,25 @@ export function createScene(
     const group = new THREE.Group();
     group.add(bezel, face);
 
-    // A wide ring around the hub, well spread in depth. The first screen is
-    // placed deliberately — it is the one the opening shot holds on.
-    const angle = i === 0 ? Math.PI : (i / SCREENS) * Math.PI * 2 + 0.9;
-    const radius = i === 0 ? 5.6 : 4.6 + rand() * 2.4;
+    /*
+      An even ring around the hub, phased so screen 0 lands on the left — that
+      is the one the opening shot holds on.
+
+      The phase is what does the work here. Giving screen 0 a hardcoded angle
+      instead left its own slot in the ring empty *and* dropped it on top of a
+      neighbour, which read as two screens overlapping on the left and one
+      missing from the upper right.
+    */
+    const angle = Math.PI + (i / SCREENS) * Math.PI * 2;
+
+    // Radius and depth vary, but only within a band: enough to keep the field
+    // from looking stamped, not enough to reintroduce overlap in perspective.
+    const radius = 5.1 + rand() * 1.3;
 
     const home = new THREE.Vector3(
       Math.cos(angle) * radius,
-      Math.sin(angle) * (2.1 + rand() * 1.4) + (i === 0 ? 0.5 : 0),
-      -1.2 - rand() * 3.4,
+      Math.sin(angle) * (2.2 + rand() * 0.9),
+      -1.4 - rand() * 2.6,
     );
 
     group.position.copy(home);
