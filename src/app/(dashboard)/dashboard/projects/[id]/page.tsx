@@ -5,7 +5,7 @@ import { ArrowLeft, ExternalLink, Inbox } from 'lucide-react';
 
 import { requireWorkspace } from '@/lib/auth';
 import { absoluteUrl } from '@/config/site';
-import { getProject, listApiKeys } from '@/server/services/projects';
+import { getProject, isProjectConnected, listApiKeys } from '@/server/services/projects';
 import { listFeedback } from '@/server/services/feedback';
 import { PageHeader } from '@/components/dashboard/shell';
 import { InstallSnippet } from '@/components/dashboard/install-snippet';
@@ -18,9 +18,10 @@ import {
 import { FeedbackRow } from '@/components/dashboard/feedback-row';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/misc';
 import { environmentMeta, projectStatusMeta } from '@/lib/taxonomy';
+import { timeAgo } from '@/lib/format';
 
 export async function generateMetadata({
   params,
@@ -46,7 +47,7 @@ export default async function ProjectDetailPage({
   const project = await getProject(context.workspaceId, id);
   if (!project) notFound();
 
-  const [keys, feedback] = await Promise.all([
+  const [keys, feedback, connection] = await Promise.all([
     listApiKeys(context.workspaceId, project.id),
     listFeedback(context.workspaceId, {
       projectId: project.id,
@@ -54,6 +55,7 @@ export default async function ProjectDetailPage({
       page: 1,
       perPage: 8,
     }),
+    isProjectConnected(context.workspaceId, project.id),
   ]);
 
   const publicKey = keys.find((key) => key.type === 'public')?.publicValue ?? '';
@@ -133,8 +135,18 @@ export default async function ProjectDetailPage({
 
         <TabsContent value="install" className="flex flex-col gap-4 pt-6">
           <Card>
-            <CardHeader>
-              <CardTitle>Install the widget</CardTitle>
+            <CardHeader className="flex-row items-start justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <CardTitle>Install the widget</CardTitle>
+                <CardDescription>
+                  {connection.connected
+                    ? `Connected — last request ${timeAgo(connection.lastSeen!)}.`
+                    : 'Not connected yet. Paste the snippet and load the page; this flips on its own.'}
+                </CardDescription>
+              </div>
+              <Badge tone={connection.connected ? 'success' : 'warning'} dot>
+                {connection.connected ? 'Connected' : 'Waiting'}
+              </Badge>
             </CardHeader>
             <CardContent className="pt-4">
               <InstallSnippet

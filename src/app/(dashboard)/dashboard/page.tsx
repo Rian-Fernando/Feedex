@@ -13,8 +13,9 @@ import {
 import { requireWorkspace } from '@/lib/auth';
 import { getWorkspaceStats, recentFeedback } from '@/server/services/feedback';
 import { listActivity } from '@/server/services/activity';
-import { listProjects } from '@/server/services/projects';
+import { getOnboarding, listProjects } from '@/server/services/projects';
 import { PageHeader } from '@/components/dashboard/shell';
+import { SetupGuide } from '@/components/dashboard/setup-guide';
 import { DistributionBar, StatCard, TrendSparkline } from '@/components/dashboard/stat-card';
 import { ActivityTimeline } from '@/components/dashboard/activity-timeline';
 import { FeedbackRow } from '@/components/dashboard/feedback-row';
@@ -23,6 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/misc';
 import { FEEDBACK_CATEGORIES } from '@/lib/taxonomy';
 import { formatCount, percentChange } from '@/lib/format';
+import { absoluteUrl } from '@/config/site';
 
 export const metadata: Metadata = {
   title: 'Overview',
@@ -41,11 +43,12 @@ const CATEGORY_BAR_CLASSES: Record<string, string> = {
 export default async function OverviewPage() {
   const context = await requireWorkspace();
 
-  const [stats, recent, activity, projects] = await Promise.all([
+  const [stats, recent, activity, projects, onboarding] = await Promise.all([
     getWorkspaceStats(context.workspaceId),
     recentFeedback(context.workspaceId, 5),
     listActivity(context.workspaceId, 8),
     listProjects(context.workspaceId),
+    getOnboarding(context.workspaceId),
   ]);
 
   const delta = percentChange(stats.last7Days, stats.previous7Days);
@@ -66,6 +69,11 @@ export default async function OverviewPage() {
           </Button>
         }
       />
+
+      {/* Guided first run, until the loop has been closed once. */}
+      {onboarding.complete ? null : (
+        <SetupGuide status={onboarding} host={absoluteUrl('/').replace(/\/$/, '')} />
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard

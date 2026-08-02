@@ -366,6 +366,15 @@ async function main(): Promise<void> {
         .where(eq(feedbackTable.id, created.id));
     }
 
+    // A workspace that has received feedback must have had its widget called,
+    // so stamp the public keys too — otherwise the demo workspace shows the
+    // first-run guide stuck on "waiting for the first request".
+    const { apiKeys } = await import('../src/lib/db/schema');
+    await db
+      .update(apiKeys)
+      .set({ lastUsedAt: new Date(Date.now() - 60 * 60 * 1000) })
+      .where(eq(apiKeys.workspaceId, workspaceId));
+
     console.log(`[seed] created ${FEEDBACK.length} feedback items`);
   }
 

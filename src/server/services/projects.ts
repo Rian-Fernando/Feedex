@@ -436,3 +436,91 @@ export async function getPublicKey(workspaceId: string, projectId: string): Prom
 
   return rows[0]?.keyHash ?? null;
 }
+
+/* ------------------------------- onboarding ------------------------------- */
+
+export interface OnboardingStatus {
+  /** Step 1 — the workspace has at least one project. */
+  hasProject: boolean;
+  /**
+   * Step 2 — the widget has actually reached us.
+   *
+   * Derived from `api_keys.last_used_at`, which ingestion already stamps. That
+   * makes it an honest signal: it can only be true if a real request arrived
+   * carrying this project's public key, which means the snippet is live on a
+   * page someone loaded.
+   */
+  widgetConnected: boolean;
+  /** Step 3 — a report has been stored. */
+  hasFeedback: boolean;
+  /** True once all three are done; the guide stops showing. */
+  complete: boolean;
+  /** The project to point the developer at, if any. */
+  project: { id: string; name: string; publicKey: string | null } | null;
+}
+
+export async function getOnboarding(workspaceId: string): Promise<OnboardingStatus> {
+  const db = await getDb();
+
+  const [projectRows, usedRows, feedbackRows] = await Promise.all([
+    db
+      .select({ id: projects.id, name: projects.name })
+      .from(projects)
+      .where(eq(projects.workspaceId, workspaceId))
+      .orderBy(projects.createdAt)
+      .limit(1),
+    db
+      .select({ id: apiKeys.id })
+      .from(apiKeys)
+      .where(and(eq(apiKeys.workspaceId, workspaceId), sql`${apiKeys.lastUsedAt} is not null`))
+      .limit(1),
+    db
+      .select({ id: feedback.id })
+      .from(feedback)
+      .where(eq(feedback.workspaceId, workspaceId))
+      .limit(1),
+  ]);
+
+  const first = projectRows[0] ?? null;
+  const hasProject = Boolean(first);
+  const widgetConnected = usedRows.length > 0;
+  const hasFeedback = feedbackRows.length > 0;
+
+  return {
+    hasProject,
+    widgetConnected,
+    hasFeedback,
+    complete: hasProject && widgetConnected && hasFeedback,
+    project: first
+      ? {
+          id: first.id,
+          name: first.name,
+          publicKey: await getPublicKey(workspaceId, first.id),
+        }
+      : null,
+  };
+}
+
+/** Whether a single project's widget has ever called home. */
+export async function isProjectConnected(
+  workspaceId: string,
+  projectId: string,
+): Promise<{ connected: boolean; lastSeen: Date | null }> {
+  const db = await getDb();
+
+  const rows = await db
+    .select({ lastUsedAt: apiKeys.lastUsedAt })
+    .from(apiKeys)
+    .where(
+      and(
+        eq(apiKeys.workspaceId, workspaceId),
+        eq(apiKeys.projectId, projectId),
+        eq(apiKeys.type, 'public'),
+        sql`${apiKeys.lastUsedAt} is not null`,
+      ),
+    )
+    .orderBy(desc(apiKeys.lastUsedAt))
+    .limit(1);
+
+  return { connected: rows.length > 0, lastSeen: rows[0]?.lastUsedAt ?? null };
+}
