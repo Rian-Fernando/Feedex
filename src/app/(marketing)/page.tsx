@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 
 import { siteConfig } from '@/config/site';
-import { Hero } from '@/components/marketing/hero';
+import { Story } from '@/components/marketing/story';
+import { FeedexBackdrop } from '@/components/three/feedex-backdrop';
 import { ProductTour } from '@/components/marketing/product-tour';
 import {
   CallToAction,
@@ -28,7 +29,10 @@ export default function HomePage() {
     <>
       <HomeStructuredData />
 
-      <Hero />
+      {/* Fixed WebGL backdrop; reads its progress from the story's scroll range. */}
+      <FeedexBackdrop storyId="story" />
+
+      <Story />
 
       <Features />
 

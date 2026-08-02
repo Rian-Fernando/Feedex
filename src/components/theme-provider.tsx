@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 
-import { usePrefersDark } from '@/lib/use-media-query';
+import { usePrefersDark } from '@/lib/client-capabilities';
 
 export type Theme = 'light' | 'dark' | 'system';
 

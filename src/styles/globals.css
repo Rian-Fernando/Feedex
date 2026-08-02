@@ -419,24 +419,6 @@
    * property of the layout here, not something the animation has to avoid
    * breaking.
    */
-  .mask-hero-scene {
-    /*
-      `--hero-mask-center` is animated from the hero as the copy fades. The
-      clear zone exists to protect the headline; once the headline is gone the
-      mask has to lift, because the scene's whole payoff is the windows
-      converging into exactly that spot.
-    */
-    --hero-mask-center: 0.16;
-
-    mask-image: radial-gradient(
-      ellipse 33% 32% at 50% 42%,
-      rgba(0, 0, 0, var(--hero-mask-center)) 0%,
-      rgba(0, 0, 0, calc(var(--hero-mask-center) + 0.18)) 46%,
-      rgba(0, 0, 0, 0.88) 72%,
-      black 88%
-    );
-  }
-
   .mask-b-fade {
     mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
   }
