@@ -1,6 +1,5 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { useEffect, useRef } from 'react';
 
 import { useTheme } from '@/components/theme-provider';
@@ -10,28 +9,25 @@ import {
   useRenderQuality,
   useWebGLSupport,
 } from '@/lib/client-capabilities';
+import type { SceneHandle } from './feedex-scene';
 
-const FeedexScene = dynamic(() => import('./feedex-scene'), { ssr: false });
-
-/** Where the scene is held when motion is off — the convergence. */
-const STILL_FRAME = 0.72;
+/** Where the scene is held when motion is off — the triage beat. */
+const STILL_FRAME = 0.7;
 
 /**
  * Decorative WebGL backdrop for the landing page.
  *
- * Everything here is progressive enhancement — the page's content is
- * server-rendered HTML sitting on top. If WebGL is unavailable the canvas
- * simply never mounts, and if the visitor prefers reduced motion the scene
- * renders as a still frame at its most striking moment.
+ * Fixed behind the entire page and driven by the whole document's scroll
+ * range, so the story runs from the first screen to the last rather than
+ * finishing a third of the way down. The page's real content is
+ * server-rendered HTML on top; if WebGL is unavailable the canvas never mounts
+ * and the page simply reads as a quiet dark layout.
  *
- * The canvas is fixed for the whole page rather than pinned to one section:
- * the story drives it from act one to act four, and past the story it keeps
- * idling behind a progressively heavier scrim so the denser content sections
- * stay comfortable to read.
- *
- * @param storyId id of the element whose scroll range drives the story
+ * The scene module is imported dynamically on mount rather than through
+ * `next/dynamic`, because it is a plain function and not a component — three.js
+ * and its postprocessing passes stay out of the initial bundle either way.
  */
-export function FeedexBackdrop({ storyId }: { storyId: string }) {
+export function FeedexBackdrop() {
   const { resolved } = useTheme();
 
   // Environment, read as external state so the first client render is already
@@ -42,39 +38,63 @@ export function FeedexBackdrop({ storyId }: { storyId: string }) {
   const visible = usePageVisible();
 
   const animate = !reduced;
+  const dark = resolved === 'dark';
 
-  // Raw scroll position; the scene eases toward this rather than snapping.
-  const targetRef = useRef(0);
+  const mountRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<SceneHandle | null>(null);
+  const progressRef = useRef(reduced ? STILL_FRAME : 0);
   const pointerRef = useRef({ x: 0, y: 0 });
-  const wrapRef = useRef<HTMLDivElement>(null);
 
-  // Scroll → story progress, plus how far past the story we are, which drives
-  // the extra scrim. Skipped entirely under reduced motion, where the scene is
-  // held at a fixed frame instead.
+  // Build and tear down the scene.
   useEffect(() => {
-    if (!webgl) return;
+    if (!webgl || !dark) return;
+
+    const mount = mountRef.current;
+    if (!mount) return;
+
+    let cancelled = false;
+
+    void import('./feedex-scene').then(({ createScene }) => {
+      if (cancelled || !mountRef.current) return;
+      sceneRef.current = createScene(mountRef.current, progressRef, pointerRef, {
+        animate,
+        quality,
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      sceneRef.current?.dispose();
+      sceneRef.current = null;
+    };
+  }, [webgl, dark, animate, quality]);
+
+  // Stop the loop while the tab is hidden.
+  useEffect(() => {
+    sceneRef.current?.setActive(visible);
+  }, [visible]);
+
+  /**
+   * Scroll → story progress across the entire document.
+   *
+   * Measured against the full scrollable height rather than one section, so
+   * the last beat lands on the last screen of the page.
+   */
+  useEffect(() => {
+    if (!webgl || !dark) return;
 
     if (reduced) {
-      targetRef.current = STILL_FRAME;
+      progressRef.current = STILL_FRAME;
       return;
     }
-
-    const story = document.getElementById(storyId);
-    if (!story) return;
 
     let frame = 0;
 
     const update = () => {
       frame = 0;
-
-      const rect = story.getBoundingClientRect();
-      const total = rect.height - window.innerHeight;
-      const scrolled = -rect.top;
-      targetRef.current = total <= 0 ? 0 : Math.min(Math.max(scrolled / total, 0), 1);
-
-      // 0 while the story is on screen, ramping to 1 over the viewport after it.
-      const past = Math.min(Math.max((scrolled - total) / (window.innerHeight * 0.7), 0), 1);
-      wrapRef.current?.style.setProperty('--past', past.toFixed(3));
+      const doc = document.documentElement;
+      const total = doc.scrollHeight - window.innerHeight;
+      progressRef.current = total <= 0 ? 0 : Math.min(Math.max(window.scrollY / total, 0), 1);
     };
 
     const onScroll = () => {
@@ -92,11 +112,11 @@ export function FeedexBackdrop({ storyId }: { storyId: string }) {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
     };
-  }, [webgl, reduced, storyId]);
+  }, [webgl, dark, reduced]);
 
   // Subtle parallax so the scene reads as a physical space.
   useEffect(() => {
-    if (!webgl || !animate || quality === 'low') return;
+    if (!webgl || !dark || !animate || quality === 'low') return;
 
     const onMove = (event: PointerEvent) => {
       pointerRef.current = {
@@ -107,31 +127,23 @@ export function FeedexBackdrop({ storyId }: { storyId: string }) {
 
     window.addEventListener('pointermove', onMove, { passive: true });
     return () => window.removeEventListener('pointermove', onMove);
-  }, [webgl, animate, quality]);
+  }, [webgl, dark, animate, quality]);
 
-  // The scene's ground, fog, and scrims are all plum. On the paper theme it
+  // The scene's ground, fog, and lighting are all plum. On the paper theme it
   // would fight the page rather than sit behind it, so the light variant is a
   // clean, quiet page instead of a recoloured scene.
-  if (!webgl || resolved !== 'dark') return null;
+  if (!webgl || !dark) return null;
 
   return (
-    <div ref={wrapRef} aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10">
-      <FeedexScene
-        targetRef={targetRef}
-        pointerRef={pointerRef}
-        animate={animate}
-        quality={quality}
-        active={visible}
-      />
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10">
+      <div ref={mountRef} className="absolute inset-0" />
 
-      {/* Keeps overlaid story copy legible against the brightest bloom. */}
-      <div className="absolute inset-0 bg-gradient-to-b from-plum-900/85 via-plum-900/55 to-plum-900/90" />
-
-      {/* Settles the scene down behind the denser content further down. */}
-      <div
-        className="absolute inset-0 bg-plum-900"
-        style={{ opacity: 'calc(var(--past, 0) * 0.94)' }}
-      />
+      {/*
+        One constant scrim rather than a ramp. The story now runs the whole
+        page, so the scene has to stay visible throughout while every band of
+        copy stays comfortably readable over it.
+      */}
+      <div className="absolute inset-0 bg-gradient-to-b from-plum-900/70 via-plum-900/60 to-plum-900/80" />
     </div>
   );
 }

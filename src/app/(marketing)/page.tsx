@@ -29,8 +29,8 @@ export default function HomePage() {
     <>
       <HomeStructuredData />
 
-      {/* Fixed WebGL backdrop; reads its progress from the story's scroll range. */}
-      <FeedexBackdrop storyId="story" />
+      {/* Fixed WebGL backdrop, driven by the whole page's scroll range. */}
+      <FeedexBackdrop />
 
       <Story />
 
