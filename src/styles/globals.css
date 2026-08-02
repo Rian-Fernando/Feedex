@@ -181,28 +181,33 @@
 }
 
 /*
- * Dialogs are centred with a translate, so their entrance has to compose the
- * scale onto that existing transform rather than replace it.
+ * Scale only — no translate.
+ *
+ * Dialogs are centred with `-translate-x-1/2 -translate-y-1/2`, and Tailwind v4
+ * compiles those to the standalone `translate` property rather than to
+ * `transform`. The two compose instead of overriding, so repeating the -50%
+ * here shifted every dialog up and left by half its own size, pushing the top
+ * of a tall one off screen.
  */
 @keyframes dialog-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.96);
+    transform: scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1);
   }
 }
 
 @keyframes dialog-out {
   from {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1);
   }
   to {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.96);
+    transform: scale(0.96);
   }
 }
 
