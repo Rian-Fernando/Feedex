@@ -2,7 +2,7 @@ import 'server-only';
 
 import { createHash, randomBytes } from 'node:crypto';
 
-import { env } from '@/config/env';
+import { appUrl } from '@/config/env';
 import { AppError } from '@/lib/errors';
 
 /**
@@ -200,7 +200,7 @@ export function enabledProviders(): Array<{ id: ProviderId; label: string }> {
 }
 
 export function callbackUrl(id: ProviderId): string {
-  return new URL(`/api/auth/${id}/callback`, env().APP_URL).toString();
+  return new URL(`/api/auth/${id}/callback`, appUrl()).toString();
 }
 
 /* --------------------------------- PKCE ---------------------------------- */

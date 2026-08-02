@@ -42,7 +42,12 @@ export const siteConfig = {
 
 export type SiteConfig = typeof siteConfig;
 
-/** Absolute URL helper that respects the configured canonical origin. */
+/**
+ * Absolute URL helper that respects the configured canonical origin.
+ *
+ * Reads the raw variable rather than `appUrl()` because this module is imported
+ * from client components too, and the env module is server-only.
+ */
 export function absoluteUrl(path = '/'): string {
   const base = process.env.APP_URL ?? siteConfig.url;
   return new URL(path, base).toString();

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
-import { env } from '@/config/env';
+import { appUrl } from '@/config/env';
 import { AppError, isAppError } from '@/lib/errors';
 import { exchangeCode, fetchProfile, getProvider, type ProviderId } from '@/lib/auth/oauth';
 import { createSession, setSessionCookie, setActiveWorkspace } from '@/lib/auth';
@@ -31,7 +31,7 @@ interface FlowState {
 }
 
 function failure(message: string): NextResponse {
-  const url = new URL('/login', env().APP_URL);
+  const url = new URL('/login', appUrl());
   url.searchParams.set('error', message);
   return NextResponse.redirect(url);
 }
@@ -105,7 +105,7 @@ export async function GET(
 
     store.delete(STATE_COOKIE);
 
-    return NextResponse.redirect(new URL(flow.r, env().APP_URL));
+    return NextResponse.redirect(new URL(flow.r, appUrl()));
   } catch (error) {
     store.delete(STATE_COOKIE);
 

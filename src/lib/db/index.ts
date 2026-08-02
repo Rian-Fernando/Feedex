@@ -34,6 +34,13 @@ type DbGlobal = {
 
 const globalRef = globalThis as unknown as DbGlobal;
 
+/** Translates the connection string's `sslmode` into a `pg` SSL option. */
+function sslConfig(url: string): boolean | { rejectUnauthorized: boolean } {
+  if (url.includes('sslmode=disable')) return false;
+  if (url.includes('sslmode=no-verify')) return { rejectUnauthorized: false };
+  return { rejectUnauthorized: true };
+}
+
 function usingPostgres(): boolean {
   // In production the answer is always yes: `requireDatabaseUrl` throws rather
   // than let the process fall back to an ephemeral embedded database.
@@ -53,9 +60,18 @@ async function createPostgresClient(): Promise<Database> {
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
-    // Managed Postgres providers (Neon, Supabase, Railway) terminate TLS with
-    // certificates that are not in Node's default trust store.
-    ssl: env().DATABASE_URL?.includes('sslmode=disable') ? false : { rejectUnauthorized: false },
+    /*
+      TLS is verified against Node's trust store by default. Neon, Supabase,
+      and Railway all present certificates from public CAs, so disabling
+      verification buys nothing and costs the guarantee that the host on the
+      other end is the one named in the connection string.
+
+      Two documented escape hatches remain, because self-hosted Postgres
+      commonly uses a self-signed certificate:
+        - `sslmode=disable`    no TLS at all
+        - `sslmode=no-verify`  TLS, but do not check the certificate
+    */
+    ssl: sslConfig(requireDatabaseUrl()),
   });
 
   return drizzle(pool, { schema, casing: 'snake_case' });

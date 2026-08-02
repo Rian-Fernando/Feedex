@@ -30,9 +30,10 @@ const serverSchema = z.object({
   AUTH_SECRET: z.string().min(32).optional(),
 
   /**
-   * Canonical origin, used for absolute URLs, cookies, and the widget snippet.
+   * Canonical origin, used for absolute URLs, OAuth callbacks, and the widget
+   * snippet. Optional — `appUrl()` derives a sensible value when it is unset.
    */
-  APP_URL: z.string().url().default('http://localhost:3000'),
+  APP_URL: z.string().url().optional(),
 
   /**
    * OAuth provider credentials. All optional: a provider without both values
@@ -149,4 +150,33 @@ export function authSecret(): string {
 
 export function isProduction(): boolean {
   return env().NODE_ENV === 'production';
+}
+
+/**
+ * The origin this instance is actually reachable at.
+ *
+ * Resolution order:
+ *
+ *   1. `APP_URL`, when set. Always wins — it is the only way to name a custom
+ *      domain, and it is what production should use.
+ *   2. Vercel's own production domain, on a production deployment.
+ *   3. Vercel's per-deployment URL, which is what a preview build wants.
+ *   4. localhost, for local development.
+ *
+ * Steps 2 and 3 exist because falling back to localhost on a real deployment
+ * produces a genuinely baffling failure: OAuth completes at the provider and
+ * then redirects the visitor to their own machine. Deriving the origin means a
+ * fresh deploy works before anyone remembers to set `APP_URL`.
+ */
+export function appUrl(): string {
+  const explicit = env().APP_URL;
+  if (explicit) return explicit.replace(/\/$/, '');
+
+  if (process.env.VERCEL_ENV === 'production' && process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+
+  return 'http://localhost:3000';
 }
