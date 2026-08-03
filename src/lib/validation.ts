@@ -246,6 +246,8 @@ export const feedbackFilterSchema = z.object({
   category: z.enum(feedbackCategory.enumValues).optional(),
   q: z.string().trim().max(200).optional(),
   sort: z.enum(['newest', 'oldest', 'priority']).default('newest'),
+  /** Accepted so the view toggle survives `safeParse`; the page reads it directly. */
+  view: z.enum(['list', 'board']).optional(),
   page: z.coerce.number().int().min(1).max(1000).default(1),
   perPage: z.coerce.number().int().min(1).max(100).default(25),
 });

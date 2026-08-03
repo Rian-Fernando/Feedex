@@ -2,13 +2,15 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Inbox } from 'lucide-react';
 
-import { requireWorkspace } from '@/lib/auth';
+import { can, requireWorkspace } from '@/lib/auth';
 import { listFeedback } from '@/server/services/feedback';
 import { listProjects } from '@/server/services/projects';
 import { feedbackFilterSchema } from '@/lib/validation';
 import { PageHeader } from '@/components/dashboard/shell';
 import { FeedbackFilters } from '@/components/dashboard/feedback-filters';
 import { FeedbackRow } from '@/components/dashboard/feedback-row';
+import { FeedbackBoard } from '@/components/dashboard/feedback-board';
+import { ViewSwitcher, type FeedbackView } from '@/components/dashboard/view-switcher';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/misc';
@@ -30,8 +32,19 @@ export default async function FeedbackPage({
   const parsed = feedbackFilterSchema.safeParse(raw);
   const filter = parsed.success ? parsed.data : feedbackFilterSchema.parse({});
 
+  const view: FeedbackView = raw.view === 'board' ? 'board' : 'list';
+
+  /*
+    The board shows every column at once, so paging through it makes no sense —
+    it asks for one large page instead. The ceiling is deliberate: past a few
+    hundred open items a board stops being readable anyway, and the columns
+    say so rather than silently truncating.
+  */
   const [result, projects] = await Promise.all([
-    listFeedback(context.workspaceId, filter),
+    listFeedback(
+      context.workspaceId,
+      view === 'board' ? { ...filter, page: 1, perPage: 100 } : filter,
+    ),
     listProjects(context.workspaceId),
   ]);
 
@@ -55,40 +68,65 @@ export default async function FeedbackPage({
         }
       />
 
-      <FeedbackFilters projects={projects.map((p) => ({ id: p.id, name: p.name }))} />
+      <div className="mb-3 flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <FeedbackFilters projects={projects.map((p) => ({ id: p.id, name: p.name }))} />
+        </div>
+        <ViewSwitcher current={view} />
+      </div>
 
-      <Card>
-        <CardContent className="p-2">
-          {result.items.length === 0 ? (
-            <EmptyState
-              icon={<Inbox aria-hidden className="size-5" />}
-              title="Nothing here"
-              description={
-                projects.length === 0
-                  ? 'Create a project and install the widget to start collecting feedback.'
-                  : 'No feedback matches these filters.'
-              }
-              action={
-                projects.length === 0 ? (
-                  <Button asChild size="sm" variant="secondary">
-                    <Link href="/dashboard/projects">Create a project</Link>
-                  </Button>
-                ) : null
-              }
-            />
-          ) : (
-            <ul className="divide-y divide-line-subtle">
-              {result.items.map((item) => (
-                <li key={item.id}>
-                  <FeedbackRow item={item} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      {view === 'board' ? (
+        result.items.length === 0 ? (
+          <Card>
+            <CardContent className="p-2">
+              <EmptyState
+                icon={<Inbox aria-hidden className="size-5" />}
+                title="Nothing here"
+                description={
+                  projects.length === 0
+                    ? 'Create a project and install the widget to start collecting feedback.'
+                    : 'No feedback matches these filters.'
+                }
+              />
+            </CardContent>
+          </Card>
+        ) : (
+          <FeedbackBoard items={result.items} canUpdate={can(context.role, 'feedback.update')} />
+        )
+      ) : (
+        <Card>
+          <CardContent className="p-2">
+            {result.items.length === 0 ? (
+              <EmptyState
+                icon={<Inbox aria-hidden className="size-5" />}
+                title="Nothing here"
+                description={
+                  projects.length === 0
+                    ? 'Create a project and install the widget to start collecting feedback.'
+                    : 'No feedback matches these filters.'
+                }
+                action={
+                  projects.length === 0 ? (
+                    <Button asChild size="sm" variant="secondary">
+                      <Link href="/dashboard/projects">Create a project</Link>
+                    </Button>
+                  ) : null
+                }
+              />
+            ) : (
+              <ul className="divide-y divide-line-subtle">
+                {result.items.map((item) => (
+                  <li key={item.id}>
+                    <FeedbackRow item={item} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
-      {result.totalPages > 1 ? (
+      {view === 'list' && result.totalPages > 1 ? (
         <nav aria-label="Pagination" className="mt-4 flex items-center justify-between gap-3">
           <p className="text-sm text-fg-subtle">
             Page {result.page} of {result.totalPages}
