@@ -4,8 +4,8 @@ import { cookies } from 'next/headers';
 import { appUrl } from '@/config/env';
 import { AppError, isAppError } from '@/lib/errors';
 import { exchangeCode, fetchProfile, getProvider, type ProviderId } from '@/lib/auth/oauth';
-import { createSession, setSessionCookie, setActiveWorkspace } from '@/lib/auth';
-import { signInWithProvider } from '@/server/services/accounts';
+import { createSession, currentUser, setSessionCookie, setActiveWorkspace } from '@/lib/auth';
+import { linkProviderToken, signInWithProvider } from '@/server/services/accounts';
 import { listUserWorkspaces } from '@/server/services/workspaces';
 import { RATE_LIMITS, consume } from '@/lib/rate-limit';
 import { clientIp } from '@/lib/api/response';
@@ -28,6 +28,8 @@ interface FlowState {
   s: string;
   v: string | null;
   r: string;
+  /** `connect` grants an extra scope to an existing session; otherwise sign-in. */
+  i?: string;
 }
 
 function failure(message: string): NextResponse {
@@ -90,6 +92,27 @@ export async function GET(
 
     const tokens = await exchangeCode(provider.id as ProviderId, code, flow.v);
     const profile = await fetchProfile(provider.id as ProviderId, tokens.accessToken);
+
+    /*
+      Connecting, not signing in. This must attach the newly-scoped token to
+      the session that is already open — creating or switching sessions here
+      would let anyone who can reach the callback take over an account by
+      completing a consent screen on their own provider account.
+    */
+    if (flow.i === 'connect') {
+      const current = await currentUser();
+      if (!current) throw AppError.unauthorized('Sign in before connecting an account.');
+
+      await linkProviderToken({
+        userId: current.id,
+        provider: provider.id,
+        profile,
+        tokens,
+      });
+
+      store.delete(STATE_COOKIE);
+      return NextResponse.redirect(new URL(flow.r, appUrl()));
+    }
 
     const { user } = await signInWithProvider({
       provider: provider.id,

@@ -177,6 +177,29 @@ floating button:
 
 ---
 
+## Filing feedback as GitHub issues
+
+Any report can be opened as a GitHub issue in one click, with the browser, OS,
+viewport, and page already filled in — the context that a hand-copied report
+always loses.
+
+**Once per account:** on a project's Settings tab, choose **Connect GitHub**.
+Feedex asks for repository access at that point rather than at sign-in, because
+most people never file issues and nobody should be asked for write access to
+their private repositories just to log in.
+
+**Once per project:** set the repository as `owner/name`. It is checked when you
+save — that it exists, that you can see it, that it is not archived, and that
+issues are enabled — so a typo surfaces immediately rather than during triage.
+
+**Then:** open any report and press **Create issue**. The button becomes a link
+to the issue afterwards, so the same report cannot be filed twice.
+
+Issues are created with **your** GitHub token, not a shared bot account. You can
+only file where you could already file, and the issue is attributed to you.
+
+---
+
 ## Managing several projects
 
 Everything is workspace-scoped, so all your sites share one dashboard:

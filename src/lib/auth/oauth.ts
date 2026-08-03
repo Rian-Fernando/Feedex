@@ -21,6 +21,21 @@ import { AppError } from '@/lib/errors';
 
 export type ProviderId = 'google' | 'github';
 
+/**
+ * Scope needed to open issues on a user's behalf.
+ *
+ * Requested only when someone explicitly connects a repository, never at
+ * sign-in. Asking every new user for write access to their private
+ * repositories just so a subset can file issues is the kind of consent screen
+ * that makes people close the tab — and it would be an honest reaction, since
+ * most of them would never use it.
+ *
+ * `repo` rather than `public_repo` because the repositories people actually
+ * track feedback against are usually private. GitHub has no narrower scope
+ * that grants issue creation.
+ */
+export const GITHUB_ISSUES_SCOPE = 'read:user user:email repo';
+
 /** A normalised profile, whatever the provider's own shape was. */
 export interface OAuthProfile {
   providerAccountId: string;
@@ -222,7 +237,7 @@ function base64url(buffer: Buffer): string {
  * httpOnly cookie and checked on the way back — that is what stops an attacker
  * from feeding the callback a code they obtained themselves.
  */
-export function buildAuthorization(id: ProviderId): AuthorizationRequest {
+export function buildAuthorization(id: ProviderId, scopeOverride?: string): AuthorizationRequest {
   const provider = getProvider(id);
   const clientId = provider.clientId();
 
@@ -237,7 +252,7 @@ export function buildAuthorization(id: ProviderId): AuthorizationRequest {
   url.searchParams.set('client_id', clientId);
   url.searchParams.set('redirect_uri', callbackUrl(id));
   url.searchParams.set('response_type', 'code');
-  url.searchParams.set('scope', provider.scope);
+  url.searchParams.set('scope', scopeOverride ?? provider.scope);
   url.searchParams.set('state', state);
 
   if (codeVerifier) {

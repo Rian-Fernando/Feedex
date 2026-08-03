@@ -266,6 +266,13 @@ export const projects = pgTable(
     status: projectStatus('status').notNull().default('active'),
     /** Accent colour used by the widget and by project chips in the dashboard. */
     color: varchar('color', { length: 16 }).notNull().default('#B58BF9'),
+    /**
+     * `owner/name` of the repository issues are filed into, or null.
+     *
+     * Stored per project rather than per workspace because a workspace with
+     * several projects almost certainly has several repositories.
+     */
+    githubRepo: varchar('github_repo', { length: 140 }),
     widgetSettings: jsonb('widget_settings')
       .$type<WidgetSettings>()
       .notNull()
@@ -361,6 +368,16 @@ export const feedback = pgTable(
       .notNull()
       .default(sql`'[]'::jsonb`),
     screenshotUrl: text('screenshot_url'),
+
+    /**
+     * The GitHub issue this report was filed as, once it has been.
+     *
+     * Held on the feedback row so the dashboard can show "already filed" and
+     * link to it, which is what stops the same report being opened three times
+     * by three people.
+     */
+    githubIssueUrl: text('github_issue_url'),
+    githubIssueNumber: integer('github_issue_number'),
 
     assignedToId: text('assigned_to_id').references(() => users.id, { onDelete: 'set null' }),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),

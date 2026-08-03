@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 import { isProduction } from '@/config/env';
-import { buildAuthorization, getProvider, type ProviderId } from '@/lib/auth/oauth';
+import {
+  buildAuthorization,
+  getProvider,
+  GITHUB_ISSUES_SCOPE,
+  type ProviderId,
+} from '@/lib/auth/oauth';
 import { apiError } from '@/lib/api/response';
 
 /**
@@ -30,7 +35,20 @@ export async function GET(
     const { provider: id } = await params;
     const provider = getProvider(id);
 
-    const { url, state, codeVerifier } = buildAuthorization(provider.id as ProviderId);
+    /*
+      Two different journeys share this route. `connect` is an already
+      signed-in user granting Feedex the extra scope needed to open issues;
+      everything else is a sign-in. The distinction is carried in the state
+      cookie so the callback knows whether to create a session or to attach a
+      token to the session that already exists.
+    */
+    const intent =
+      new URL(request.url).searchParams.get('intent') === 'connect' ? 'connect' : 'signin';
+
+    const scope =
+      intent === 'connect' && provider.id === 'github' ? GITHUB_ISSUES_SCOPE : undefined;
+
+    const { url, state, codeVerifier } = buildAuthorization(provider.id as ProviderId, scope);
 
     // Where to land afterwards. Only same-origin paths, so the callback can
     // never be used as an open redirect.
@@ -40,7 +58,7 @@ export async function GET(
     const store = await cookies();
     store.set(
       STATE_COOKIE,
-      JSON.stringify({ p: provider.id, s: state, v: codeVerifier, r: returnTo }),
+      JSON.stringify({ p: provider.id, s: state, v: codeVerifier, r: returnTo, i: intent }),
       {
         httpOnly: true,
         secure: isProduction(),

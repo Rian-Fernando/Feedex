@@ -17,6 +17,8 @@ import {
 import { requireWorkspace } from '@/lib/auth';
 import { getFeedback, listAttachments, listNotes } from '@/server/services/feedback';
 import { getVocabulary } from '@/server/services/labels';
+import { getProject } from '@/server/services/projects';
+import { CreateIssueButton } from '@/components/dashboard/github-panel';
 import { formatBytes, isInlineImage } from '@/lib/attachments';
 import { PageHeader } from '@/components/dashboard/shell';
 import {
@@ -49,10 +51,11 @@ export default async function FeedbackDetailPage({ params }: { params: Promise<{
   const item = await getFeedback(context.workspaceId, id);
   if (!item) notFound();
 
-  const [notes, attachments, vocabulary] = await Promise.all([
+  const [notes, attachments, vocabulary, project] = await Promise.all([
     listNotes(context.workspaceId, id),
     listAttachments(context.workspaceId, id),
     getVocabulary(context.workspaceId),
+    getProject(context.workspaceId, item.projectId),
   ]);
 
   const priority = priorityMeta(item.priority);
@@ -107,7 +110,16 @@ export default async function FeedbackDetailPage({ params }: { params: Promise<{
       <PageHeader
         title={item.title}
         description={`#${item.reference} in ${item.projectName} · ${timeAgo(item.createdAt)}`}
-        action={<DeleteFeedbackButton feedbackId={item.id} />}
+        action={
+          <div className="flex items-center gap-2">
+            <CreateIssueButton
+              feedbackId={item.id}
+              issueUrl={item.githubIssueUrl}
+              disabled={!project?.githubRepo}
+            />
+            <DeleteFeedbackButton feedbackId={item.id} />
+          </div>
+        }
       />
 
       <div className="grid gap-4 lg:grid-cols-3">

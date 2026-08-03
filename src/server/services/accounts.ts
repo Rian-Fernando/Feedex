@@ -334,3 +334,83 @@ export async function unlinkProvider(userId: string, provider: string): Promise<
     .delete(accounts)
     .where(and(eq(accounts.userId, userId), eq(accounts.provider, provider)));
 }
+
+/**
+ * Stores a freshly-scoped provider token against the signed-in user.
+ *
+ * Separate from `signInWithProvider` because this is authorisation, not
+ * authentication: the session already exists and must not be replaced. It also
+ * refuses to attach a provider account that belongs to somebody else, which is
+ * what stops one user's GitHub identity being bound to another user's Feedex
+ * account by completing a consent screen at the right moment.
+ */
+export async function linkProviderToken(input: {
+  userId: string;
+  provider: string;
+  profile: { providerAccountId: string; email: string };
+  tokens: {
+    accessToken: string;
+    refreshToken: string | null;
+    expiresAt: Date | null;
+    scope: string | null;
+  };
+}): Promise<void> {
+  const db = await getDb();
+
+  const existing = await db
+    .select({ userId: accounts.userId })
+    .from(accounts)
+    .where(
+      and(
+        eq(accounts.provider, input.provider),
+        eq(accounts.providerAccountId, input.profile.providerAccountId),
+      ),
+    )
+    .limit(1);
+
+  if (existing[0] && existing[0].userId !== input.userId) {
+    throw AppError.conflict(
+      'That account is already connected to a different Feedex user. Sign out of it on the provider and try again.',
+    );
+  }
+
+  await db
+    .insert(accounts)
+    .values({
+      userId: input.userId,
+      provider: input.provider,
+      providerAccountId: input.profile.providerAccountId,
+      accessToken: input.tokens.accessToken,
+      refreshToken: input.tokens.refreshToken,
+      expiresAt: input.tokens.expiresAt,
+      scope: input.tokens.scope,
+    })
+    .onConflictDoUpdate({
+      target: [accounts.provider, accounts.providerAccountId],
+      set: {
+        accessToken: input.tokens.accessToken,
+        refreshToken: input.tokens.refreshToken,
+        expiresAt: input.tokens.expiresAt,
+        scope: input.tokens.scope,
+      },
+    });
+}
+
+/** The stored provider token for a user, or null if they have not connected. */
+export async function getProviderToken(
+  userId: string,
+  provider: string,
+): Promise<{ accessToken: string; scope: string | null } | null> {
+  const db = await getDb();
+
+  const rows = await db
+    .select({ accessToken: accounts.accessToken, scope: accounts.scope })
+    .from(accounts)
+    .where(and(eq(accounts.userId, userId), eq(accounts.provider, provider)))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row?.accessToken) return null;
+
+  return { accessToken: row.accessToken, scope: row.scope };
+}

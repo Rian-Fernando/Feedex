@@ -8,6 +8,9 @@ import { absoluteUrl } from '@/config/site';
 import { getProject, isProjectConnected, listApiKeys } from '@/server/services/projects';
 import { listFeedback } from '@/server/services/feedback';
 import { getVocabulary } from '@/server/services/labels';
+import { connectedToGithub } from '@/server/actions/github';
+import { GithubPanel } from '@/components/dashboard/github-panel';
+import { can } from '@/lib/auth';
 import { PageHeader } from '@/components/dashboard/shell';
 import { InstallSnippet } from '@/components/dashboard/install-snippet';
 import { ApiKeysPanel } from '@/components/dashboard/api-keys-panel';
@@ -48,7 +51,7 @@ export default async function ProjectDetailPage({
   const project = await getProject(context.workspaceId, id);
   if (!project) notFound();
 
-  const [keys, feedback, connection, vocabulary] = await Promise.all([
+  const [keys, feedback, connection, vocabulary, githubConnected] = await Promise.all([
     listApiKeys(context.workspaceId, project.id),
     listFeedback(context.workspaceId, {
       projectId: project.id,
@@ -58,6 +61,7 @@ export default async function ProjectDetailPage({
     }),
     isProjectConnected(context.workspaceId, project.id),
     getVocabulary(context.workspaceId),
+    connectedToGithub(),
   ]);
 
   const publicKey = keys.find((key) => key.type === 'public')?.publicValue ?? '';
@@ -165,6 +169,12 @@ export default async function ProjectDetailPage({
         <TabsContent value="settings" className="flex flex-col gap-4 pt-6">
           <ProjectSettingsForm project={project} />
           <WidgetSettingsForm project={project} categories={vocabulary.categories} />
+          <GithubPanel
+            projectId={project.id}
+            repo={project.githubRepo}
+            connected={githubConnected}
+            canEdit={can(context.role, 'project.update')}
+          />
           <ProjectDangerZone project={project} />
         </TabsContent>
       </Tabs>
