@@ -3,7 +3,7 @@
 [![CI](https://github.com/Rian-Fernando/Feedex/actions/workflows/ci.yml/badge.svg)](https://github.com/Rian-Fernando/Feedex/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/Rian-Fernando/Feedex/actions/workflows/codeql.yml/badge.svg)](https://github.com/Rian-Fernando/Feedex/actions/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Widget: 7 kB gzipped](https://img.shields.io/badge/widget-7%20kB%20gzipped-B58BF9)](docs/WIDGET.md)
+[![Widget: 10 kB gzipped](https://img.shields.io/badge/widget-10%20kB%20gzipped-B58BF9)](docs/WIDGET.md)
 [![Live](https://img.shields.io/badge/live-feedex.rianfernando.com-F7B83D)](https://feedex.rianfernando.com)
 
 Collect feedback from every project in one place. Drop a single script tag into
@@ -234,13 +234,14 @@ docs/                         architecture, API, widget, deployment
 
 ## Documentation
 
-| Document                                | Contents                                                               |
-| --------------------------------------- | ---------------------------------------------------------------------- |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Data model, tenancy, request paths, the decisions and their trade-offs |
-| [API.md](docs/API.md)                   | REST reference, auth, errors, rate limits                              |
-| [WIDGET.md](docs/WIDGET.md)             | Install, configure, and drive the widget                               |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md)     | Vercel, Postgres, Cloudflare DNS, Search Console                       |
-| [ROADMAP.md](docs/ROADMAP.md)           | What is next and why it is not here yet                                |
+| Document                                      | Contents                                                               |
+| --------------------------------------------- | ---------------------------------------------------------------------- |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md)       | Data model, tenancy, request paths, the decisions and their trade-offs |
+| [API.md](docs/API.md)                         | REST reference, auth, errors, rate limits                              |
+| [WIDGET.md](docs/WIDGET.md)                   | Install, configure, and drive the widget                               |
+| [ADDING_PROJECTS.md](docs/ADDING_PROJECTS.md) | Putting the widget on each of your sites, step by step                 |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md)           | Vercel, Postgres, Cloudflare DNS, Search Console                       |
+| [ROADMAP.md](docs/ROADMAP.md)                 | What is next and why it is not here yet                                |
 
 ## Roadmap
 

@@ -30,8 +30,13 @@ const COLUMNS = [
         external: true,
       },
       {
+        label: 'Add a project',
+        href: `${siteConfig.links.github}/blob/main/docs/ADDING_PROJECTS.md`,
+        external: true,
+      },
+      {
         label: 'Self-hosting',
-        href: `${siteConfig.links.github}/blob/main/docs/SELF_HOSTING.md`,
+        href: `${siteConfig.links.github}/blob/main/docs/DEPLOYMENT.md`,
         external: true,
       },
     ],

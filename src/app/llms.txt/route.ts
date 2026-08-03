@@ -83,7 +83,8 @@ No build step, no package to install, no framework requirement.
 - Source repository: ${repo}
 - API reference: ${repo}/blob/main/docs/API.md
 - Widget documentation: ${repo}/blob/main/docs/WIDGET.md
-- Self-hosting guide: ${repo}/blob/main/docs/SELF_HOSTING.md
+- Adding the widget to a site: ${repo}/blob/main/docs/ADDING_PROJECTS.md
+- Self-hosting guide: ${repo}/blob/main/docs/DEPLOYMENT.md
 - Architecture notes: ${repo}/blob/main/docs/ARCHITECTURE.md
 - Built by Rian Fernando — ${siteConfig.author.url}
 - More projects — ${siteConfig.author.projects}
