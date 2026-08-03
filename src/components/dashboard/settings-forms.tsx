@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Monitor, Moon, Sun, Trash2 } from 'lucide-react';
+import { Moon, Sun, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/cn';
@@ -153,9 +153,8 @@ export function PasswordForm() {
 }
 
 const THEMES: Array<{ value: Theme; label: string; icon: typeof Sun }> = [
-  { value: 'light', label: 'Light', icon: Sun },
   { value: 'dark', label: 'Dark', icon: Moon },
-  { value: 'system', label: 'System', icon: Monitor },
+  { value: 'light', label: 'Light', icon: Sun },
 ];
 
 export function AppearanceForm() {
@@ -165,13 +164,16 @@ export function AppearanceForm() {
     <Card>
       <CardHeader>
         <CardTitle>Appearance</CardTitle>
-        <CardDescription>Applies to this browser.</CardDescription>
+        <CardDescription>
+          Dark by default. Applies to this browser, and to the dashboard only — the marketing site
+          is always dark.
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="pt-4">
         <fieldset>
           <legend className="sr-only">Theme</legend>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid max-w-sm gap-3 sm:grid-cols-2">
             {THEMES.map((option) => (
               <label
                 key={option.value}

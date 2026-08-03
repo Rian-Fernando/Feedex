@@ -34,6 +34,13 @@ function FormError({ message }: { message?: string }) {
   );
 }
 
+/** Preserves a `next` destination when moving between sign-in and sign-up. */
+function withNext(path: string, next: string | null): string {
+  return next?.startsWith('/') && !next.startsWith('//')
+    ? `${path}?next=${encodeURIComponent(next)}`
+    : path;
+}
+
 const INITIAL: ActionResult = { ok: false };
 
 export function LoginForm({
@@ -108,7 +115,16 @@ export function LoginForm({
 
       <p className="text-center text-sm text-fg-muted">
         Don&apos;t have an account?{' '}
-        <Link href="/register" className="font-medium text-accent-500 hover:underline">
+        {/*
+          Carries `next` across. Someone who followed an invitation and has no
+          account yet passes through here, and dropping the parameter at this
+          link is precisely how they end up in an empty workspace of their own
+          wondering where the invitation went.
+        */}
+        <Link
+          href={withNext('/register', next)}
+          className="font-medium text-accent-500 hover:underline"
+        >
           Create one
         </Link>
       </p>
@@ -122,14 +138,27 @@ export function RegisterForm({
   providers?: Array<{ id: string; label: string }>;
 }) {
   const router = useRouter();
+  const params = useSearchParams();
   const [state, formAction, pending] = React.useActionState(registerAction, INITIAL);
+
+  /*
+    Honours `next`, as sign-in does. Someone who followed an invitation and had
+    no account yet arrives here; sending them to the dashboard afterwards drops
+    them into an empty workspace of their own, having silently lost the
+    invitation they clicked. Same-origin paths only, so this cannot be turned
+    into an open redirect.
+  */
+  const next = params.get('next');
 
   React.useEffect(() => {
     if (state.ok) {
+      // Navigate first, then refresh. Refreshing first re-runs the page's own
+      // server component with the new session, and its redirect would land
+      // before this push does.
+      router.push(next?.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');
       router.refresh();
-      router.push('/dashboard');
     }
-  }, [state.ok, router]);
+  }, [state.ok, router, next]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -140,7 +169,7 @@ export function RegisterForm({
         </p>
       </div>
 
-      <ProviderButtons providers={providers} verb="Sign up with" />
+      <ProviderButtons providers={providers} verb="Sign up with" next={next ?? undefined} />
 
       <form action={formAction} className="flex flex-col gap-4">
         <FormError message={state.code !== 'validation_error' ? state.error : undefined} />
@@ -185,7 +214,10 @@ export function RegisterForm({
 
       <p className="text-center text-sm text-fg-muted">
         Already have an account?{' '}
-        <Link href="/login" className="font-medium text-accent-500 hover:underline">
+        <Link
+          href={withNext('/login', next)}
+          className="font-medium text-accent-500 hover:underline"
+        >
           Sign in
         </Link>
       </p>

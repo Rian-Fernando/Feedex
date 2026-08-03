@@ -16,8 +16,16 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function LoginPage() {
-  if (await currentUser()) redirect('/dashboard');
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  if (await currentUser()) {
+    // Same-origin paths only, so this cannot be used as an open redirect.
+    const { next } = await searchParams;
+    redirect(next?.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');
+  }
 
   return (
     // `useSearchParams` in the form requires a Suspense boundary above it.

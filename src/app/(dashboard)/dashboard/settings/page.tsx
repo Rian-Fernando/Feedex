@@ -3,7 +3,8 @@ import { Database } from 'lucide-react';
 
 import { can, requireWorkspace } from '@/lib/auth';
 import { databaseDriver } from '@/lib/db';
-import { getWorkspace, listMembers } from '@/server/services/workspaces';
+import { getWorkspace, listInvitations, listMembers } from '@/server/services/workspaces';
+import { MembersPanel } from '@/components/dashboard/members-panel';
 import { getVocabulary } from '@/server/services/labels';
 import { LabelManager } from '@/components/dashboard/label-manager';
 import { PageHeader } from '@/components/dashboard/shell';
@@ -26,10 +27,11 @@ export const metadata: Metadata = {
 export default async function SettingsPage() {
   const context = await requireWorkspace();
 
-  const [workspace, members, vocabulary] = await Promise.all([
+  const [workspace, members, vocabulary, invitations] = await Promise.all([
     getWorkspace(context.workspaceId),
     listMembers(context.workspaceId),
     getVocabulary(context.workspaceId),
+    listInvitations(context.workspaceId),
   ]);
 
   const canEditWorkspace = can(context.role, 'workspace.update');
@@ -106,36 +108,14 @@ export default async function SettingsPage() {
           ) : null}
         </TabsContent>
 
-        <TabsContent value="members" className="max-w-2xl pt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Members</CardTitle>
-              <CardDescription>
-                Everyone with access to this workspace. Invitations arrive in a future release — the
-                roles and permissions model is already in place.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-3">
-              <ul className="divide-y divide-line-subtle">
-                {members.map((member) => (
-                  <li key={member.userId} className="flex items-center gap-3 py-3 first:pt-0">
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-xs font-semibold text-fg-muted">
-                      {member.name.slice(0, 1).toUpperCase()}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-fg">
-                        {member.name}
-                      </span>
-                      <span className="block truncate text-xs text-fg-subtle">{member.email}</span>
-                    </span>
-                    <Badge tone={member.role === 'owner' ? 'accent' : 'neutral'} size="sm">
-                      {member.role}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+        <TabsContent value="members" className="flex max-w-2xl flex-col gap-4 pt-6">
+          <MembersPanel
+            members={members}
+            invitations={invitations}
+            currentUserId={context.user.id}
+            currentRole={context.role}
+            canManage={can(context.role, 'member.manage')}
+          />
         </TabsContent>
       </Tabs>
     </>

@@ -214,6 +214,36 @@ ever grants "create feedback for this one project".
 
 ---
 
+## Adding people to a workspace
+
+Settings → **Members** → **Invite someone**.
+
+Feedex creates a **link** rather than sending an email. There is no mail
+provider to configure, no domain to verify, and no deliverability problem —
+paste the link into Slack, a DM, or an email you send yourself.
+
+- **With an email address** — only that address can accept, so forwarding the
+  link grants nobody else access.
+- **Without one** — anyone holding the link can accept it, once.
+
+Links expire after seven days and work a single time. Only a hash of the token
+is stored, so the link is shown **once** at creation; if it is lost, revoke the
+invitation and make another.
+
+### Roles
+
+| Role       | Can                                                                                   |
+| ---------- | ------------------------------------------------------------------------------------- |
+| **Owner**  | Everything, including deleting the workspace. Only an owner can create another owner. |
+| **Admin**  | Manage projects, members, and all feedback.                                           |
+| **Member** | Create projects and triage feedback.                                                  |
+| **Viewer** | Read-only access to projects and feedback.                                            |
+
+A workspace always keeps at least one owner — the last one cannot be demoted or
+removed.
+
+---
+
 ## Troubleshooting
 
 **The badge stays on Waiting.**

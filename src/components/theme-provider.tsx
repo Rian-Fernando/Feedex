@@ -2,9 +2,16 @@
 
 import * as React from 'react';
 
-import { usePrefersDark } from '@/lib/client-capabilities';
-
-export type Theme = 'light' | 'dark' | 'system';
+/**
+ * Two themes, not three.
+ *
+ * Feedex is a dark product — the marketing site is dark unconditionally and
+ * the palette was designed there. "Match my system" sounds accommodating but
+ * in practice it means a visitor whose laptop is in light mode gets the theme
+ * nobody designed against, without ever asking for it. Dark is the default and
+ * light is a deliberate choice.
+ */
+export type Theme = 'light' | 'dark';
 
 const STORAGE_KEY = 'feedex-theme';
 
@@ -26,7 +33,10 @@ const ThemeContext = React.createContext<ThemeContextValue | null>(null);
 function readStoredTheme(): Theme {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored;
+    // Anything else — including the "system" this used to support — resolves to
+    // dark rather than being honoured, so an old stored value does not keep a
+    // browser on a setting the UI can no longer express.
+    if (stored === 'light') return 'light';
   } catch {
     // Storage can be unavailable (private mode, blocked cookies).
   }
@@ -68,8 +78,7 @@ export function ThemeProvider({
   initial?: Theme;
 }) {
   const theme = React.useSyncExternalStore(subscribe, readStoredTheme, () => initial);
-  const prefersDark = usePrefersDark();
-  const resolved: 'light' | 'dark' = theme === 'system' ? (prefersDark ? 'dark' : 'light') : theme;
+  const resolved: 'light' | 'dark' = theme;
 
   // Writing a class onto <html> is a side effect on an external system, which
   // is precisely what an effect is for.
@@ -108,8 +117,10 @@ export function ThemeScript({ defaultTheme = 'dark' }: { defaultTheme?: Theme })
   const script = `
 (function () {
   try {
+    // Only an explicit 'light' opts out; everything else, including the
+    // retired 'system' value, is dark.
     var stored = localStorage.getItem('${STORAGE_KEY}') || '${defaultTheme}';
-    var dark = stored === 'dark' || (stored === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+    var dark = stored !== 'light';
     document.documentElement.classList.toggle('dark', dark);
     document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
   } catch (e) {

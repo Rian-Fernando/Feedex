@@ -40,11 +40,6 @@ export function usePrefersReducedMotion(): boolean {
   return useMediaQuery('(prefers-reduced-motion: reduce)');
 }
 
-/** Whether the platform colour scheme is dark. */
-export function usePrefersDark(): boolean {
-  return useMediaQuery('(prefers-color-scheme: dark)');
-}
-
 /* -------------------------------- WebGL ---------------------------------- */
 
 /**

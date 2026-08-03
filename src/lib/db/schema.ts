@@ -246,6 +246,46 @@ export const workspaceLabels = pgTable(
   ],
 );
 
+/**
+ * Pending invitations to a workspace.
+ *
+ * Invitations are links rather than emails. Feedex has no mail provider, and
+ * adding one would mean a third-party account, an API key, a domain to verify,
+ * and a deliverability problem — for a product whose whole pitch is that it
+ * needs one script tag and a database. A link can be pasted into Slack, a DM,
+ * or an email the inviter sends themselves, and it works the moment it is
+ * created.
+ *
+ * Only a SHA-256 of the token is stored, exactly as sessions do. The raw token
+ * exists in the URL and nowhere else, so a leaked database backup cannot be
+ * used to join anybody's workspace.
+ */
+export const workspaceInvitations = pgTable(
+  'workspace_invitations',
+  {
+    /** SHA-256 of the invite token. The raw value only lives in the link. */
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    /**
+     * Optional. When set, only this address may accept — which is what makes a
+     * forwarded link harmless.
+     */
+    email: varchar('email', { length: 320 }),
+    role: workspaceRole('role').notNull().default('member'),
+    invitedById: text('invited_by_id').references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    acceptedById: text('accepted_by_id').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('workspace_invitations_workspace_idx').on(table.workspaceId, table.createdAt),
+    index('workspace_invitations_expires_idx').on(table.expiresAt),
+  ],
+);
+
 /* -------------------------------------------------------------------------- */
 /*                                  Projects                                  */
 /* -------------------------------------------------------------------------- */
@@ -641,6 +681,7 @@ export type FeedbackStatus = string;
 export type BuiltInCategory = (typeof feedbackCategory.enumValues)[number];
 export type BuiltInStatus = (typeof feedbackStatus.enumValues)[number];
 
+export type WorkspaceInvitation = typeof workspaceInvitations.$inferSelect;
 export type WorkspaceLabel = typeof workspaceLabels.$inferSelect;
 export type NewWorkspaceLabel = typeof workspaceLabels.$inferInsert;
 export type LabelKind = (typeof labelKind.enumValues)[number];
