@@ -528,3 +528,195 @@
     background: transparent;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/*                             Rendered documentation                          */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Styling for Markdown rendered at build time from `docs/*.md`.
+ *
+ * Written against the design tokens rather than pulled in from a typography
+ * plugin: the docs have to sit inside the marketing shell and inherit its
+ * palette, and a plugin's opinions would have to be overridden more than they
+ * would be used.
+ */
+@layer components {
+  .doc-prose {
+    color: var(--fg-muted);
+    font-size: 0.9375rem;
+    line-height: 1.75;
+  }
+
+  .doc-prose > * + * {
+    margin-top: 1.15em;
+  }
+
+  .doc-prose h2,
+  .doc-prose h3,
+  .doc-prose h4 {
+    color: var(--fg);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    scroll-margin-top: 6rem;
+  }
+
+  .doc-prose h2 {
+    margin-top: 2.75rem;
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--line-subtle);
+    font-size: 1.375rem;
+  }
+
+  /* The rule above a heading that directly follows the page header would
+     double up with the header's own border. */
+  .doc-prose > h2:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .doc-prose h3 {
+    margin-top: 2rem;
+    font-size: 1.0625rem;
+  }
+
+  .doc-prose h4 {
+    margin-top: 1.5rem;
+    font-size: 0.9375rem;
+  }
+
+  /* The heading is its own anchor, so it must not look like body-copy link. */
+  .doc-prose .doc-anchor {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .doc-prose .doc-anchor:hover {
+    text-decoration: underline;
+    text-decoration-color: var(--accent-500);
+    text-underline-offset: 4px;
+  }
+
+  .doc-prose a:not(.doc-anchor) {
+    color: var(--accent-500);
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklab, var(--accent-500) 40%, transparent);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 0.15s ease;
+  }
+
+  .doc-prose a:not(.doc-anchor):hover {
+    text-decoration-color: var(--accent-500);
+  }
+
+  .doc-prose strong {
+    color: var(--fg);
+    font-weight: 600;
+  }
+
+  .doc-prose ul,
+  .doc-prose ol {
+    padding-left: 1.25rem;
+  }
+
+  .doc-prose ul {
+    list-style: disc;
+  }
+
+  .doc-prose ol {
+    list-style: decimal;
+  }
+
+  .doc-prose li::marker {
+    color: var(--fg-subtle);
+  }
+
+  .doc-prose li + li {
+    margin-top: 0.4rem;
+  }
+
+  .doc-prose li > ul,
+  .doc-prose li > ol {
+    margin-top: 0.4rem;
+  }
+
+  /* Inline code only. The `:not` keeps this off code inside a fence, which is
+     styled by its `pre` and would otherwise get a second background. */
+  .doc-prose :not(pre) > code {
+    background: var(--surface-inset);
+    border: 1px solid var(--line-subtle);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.85em;
+    color: var(--fg);
+  }
+
+  .doc-prose pre {
+    background: var(--surface-sunken);
+    border: 1px solid var(--line-subtle);
+    border-radius: 0.625rem;
+    padding: 1rem 1.15rem;
+    overflow-x: auto;
+    font-size: 0.8125rem;
+    line-height: 1.7;
+  }
+
+  .doc-prose pre code {
+    font-family: var(--font-mono, ui-monospace, monospace);
+    color: var(--fg-muted);
+  }
+
+  .doc-prose blockquote {
+    border-left: 2px solid var(--accent-500);
+    padding-left: 1rem;
+    color: var(--fg-muted);
+    font-style: italic;
+  }
+
+  .doc-prose hr {
+    border: 0;
+    border-top: 1px solid var(--line-subtle);
+    margin-block: 2rem;
+  }
+
+  /* Wide tables scroll inside their own container so the page body never
+     scrolls sideways on a phone. */
+  .doc-table {
+    overflow-x: auto;
+    border: 1px solid var(--line-subtle);
+    border-radius: 0.625rem;
+  }
+
+  .doc-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    text-align: left;
+  }
+
+  .doc-prose th {
+    background: var(--surface-inset);
+    color: var(--fg);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .doc-prose th,
+  .doc-prose td {
+    padding: 0.6rem 0.9rem;
+    border-bottom: 1px solid var(--line-subtle);
+    vertical-align: top;
+  }
+
+  .doc-prose tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .doc-prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+  }
+}

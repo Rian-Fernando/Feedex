@@ -1,6 +1,6 @@
 # Widget
 
-The embeddable feedback widget. 7 kB gzipped, no dependencies, no build step.
+The embeddable feedback widget. 10 kB gzipped, no dependencies, no build step.
 
 ---
 

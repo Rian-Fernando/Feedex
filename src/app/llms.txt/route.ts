@@ -33,7 +33,7 @@ A visitor to any instrumented site clicks a feedback button, picks a category, d
 
 ## Key features
 
-- **Embeddable widget** — one script tag, 7 kB gzipped, no dependencies, rendered inside a shadow root so it cannot inherit or leak page styles.
+- **Embeddable widget** — one script tag, 10 kB gzipped, no dependencies, rendered inside a shadow root so it cannot inherit or leak page styles.
 - **Automatic context capture** — page URL and path, referrer, browser and version, operating system, device class, viewport and screen size, language, and timezone. No cookies are read, no storage is written, and no fingerprint is computed.
 - **Multi-project dashboard** — every project has its own widget configuration, keys, and feedback stream; all of them roll up into one workspace view.
 - **Triage workflow** — seven categories (bug, feature request, UI issue, performance, content, question, other), five statuses (open, in progress, testing, resolved, closed), and four priorities (low, medium, high, critical).

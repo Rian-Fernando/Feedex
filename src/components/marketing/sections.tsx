@@ -90,7 +90,7 @@ const FEATURES = [
     icon: Gauge,
     title: 'A widget that stays out of the way',
     description:
-      '7 kB gzipped, zero dependencies, rendered in a shadow root. It cannot inherit your styles and cannot leak into them.',
+      '10 kB gzipped, zero dependencies, rendered in a shadow root. It cannot inherit your styles and cannot leak into them.',
   },
   {
     icon: ShieldCheck,

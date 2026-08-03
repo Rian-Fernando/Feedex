@@ -18,27 +18,12 @@ const COLUMNS = [
   {
     heading: 'Resources',
     links: [
+      { label: 'Documentation', href: '/docs' },
+      { label: 'Quickstart', href: '/docs/quickstart' },
+      { label: 'Widget guide', href: '/docs/widget' },
+      { label: 'API reference', href: '/docs/api' },
+      { label: 'Self-hosting', href: '/docs/self-hosting' },
       { label: 'GitHub', href: siteConfig.links.github, external: true },
-      {
-        label: 'API reference',
-        href: `${siteConfig.links.github}/blob/main/docs/API.md`,
-        external: true,
-      },
-      {
-        label: 'Widget guide',
-        href: `${siteConfig.links.github}/blob/main/docs/WIDGET.md`,
-        external: true,
-      },
-      {
-        label: 'Add a project',
-        href: `${siteConfig.links.github}/blob/main/docs/ADDING_PROJECTS.md`,
-        external: true,
-      },
-      {
-        label: 'Self-hosting',
-        href: `${siteConfig.links.github}/blob/main/docs/DEPLOYMENT.md`,
-        external: true,
-      },
     ],
   },
   {

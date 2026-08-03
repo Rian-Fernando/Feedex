@@ -90,8 +90,8 @@ export function Story() {
         </h2>
         <p className="mt-4 max-w-xl leading-relaxed text-fg-muted">
           No build step, no package to install, no framework requirement. Paste it once and a
-          feedback button appears in the corner — 7 kB, rendered in a shadow root so it cannot touch
-          your styles or be touched by them.
+          feedback button appears in the corner — 10 kB, rendered in a shadow root so it cannot
+          touch your styles or be touched by them.
         </p>
 
         <div className="edge-highlight mt-8 overflow-hidden rounded-xl border border-line bg-surface-raised/80 shadow-raised backdrop-blur">
@@ -112,7 +112,7 @@ export function Story() {
         </div>
 
         <ul className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-fg-subtle">
-          {['7 kB gzipped', 'No dependencies', 'Works on any framework', 'MIT licensed'].map(
+          {['10 kB gzipped', 'No dependencies', 'Works on any framework', 'MIT licensed'].map(
             (item) => (
               <li key={item} className="flex items-center gap-1.5">
                 <Check aria-hidden className="size-3 text-success-500" />

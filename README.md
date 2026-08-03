@@ -23,7 +23,7 @@ or no inbox at all.
 
 Feedex inverts that. Every project gets its own widget, its own keys, and its own
 feedback stream — and all of them roll up into a single workspace you actually
-check. The widget is 7 kB gzipped with no dependencies, renders inside a shadow
+check. The widget is 10 kB gzipped with no dependencies, renders inside a shadow
 root so it cannot touch or be touched by your page's CSS, and attaches the
 technical context automatically. The reporter types one thing; you get everything
 you would otherwise have to ask for.

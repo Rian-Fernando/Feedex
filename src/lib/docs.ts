@@ -74,7 +74,9 @@ const PUBLISHED = [
 export type DocSlug = (typeof PUBLISHED)[number]['slug'];
 
 /** Maps a repo-relative Markdown link onto its published route. */
-const ROUTE_BY_FILE = new Map(PUBLISHED.map((doc) => [doc.file, `/docs/${doc.slug}`]));
+const ROUTE_BY_FILE = new Map<string, string>(
+  PUBLISHED.map((doc) => [doc.file, `/docs/${doc.slug}`]),
+);
 
 function slugifyHeading(text: string): string {
   return text
