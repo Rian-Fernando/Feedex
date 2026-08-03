@@ -41,6 +41,25 @@ function sslConfig(url: string): boolean | { rejectUnauthorized: boolean } {
   return { rejectUnauthorized: true };
 }
 
+/**
+ * Pins `sslmode` to the semantics this code already enforces.
+ *
+ * Providers hand out connection strings ending in `sslmode=require`. Today
+ * `pg` treats that as full verification, but it warns that pg 9 will switch it
+ * to libpq semantics — where `require` encrypts without authenticating the
+ * server, which is exactly the downgrade that makes a connection string worth
+ * stealing.
+ *
+ * Rewriting it to `verify-full` states the intent that the `ssl` option below
+ * already implements, so the behaviour is identical before and after that
+ * release rather than quietly weakening on a dependency bump. The escape
+ * hatches are left untouched.
+ */
+export function pinSslMode(url: string): string {
+  if (/sslmode=(disable|no-verify|verify-full)/.test(url)) return url;
+  return url.replace(/sslmode=(require|prefer|verify-ca)/, 'sslmode=verify-full');
+}
+
 function usingPostgres(): boolean {
   // In production the answer is always yes: `requireDatabaseUrl` throws rather
   // than let the process fall back to an ephemeral embedded database.
@@ -56,7 +75,7 @@ async function createPostgresClient(): Promise<Database> {
   const { drizzle } = await import('drizzle-orm/node-postgres');
 
   const pool = new Pool({
-    connectionString: requireDatabaseUrl(),
+    connectionString: pinSslMode(requireDatabaseUrl()),
     max: 10,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
