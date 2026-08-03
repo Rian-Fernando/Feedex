@@ -5,6 +5,7 @@ import { Inbox } from 'lucide-react';
 import { can, requireWorkspace } from '@/lib/auth';
 import { listFeedback } from '@/server/services/feedback';
 import { listProjects } from '@/server/services/projects';
+import { getVocabulary } from '@/server/services/labels';
 import { feedbackFilterSchema } from '@/lib/validation';
 import { PageHeader } from '@/components/dashboard/shell';
 import { FeedbackFilters } from '@/components/dashboard/feedback-filters';
@@ -40,12 +41,13 @@ export default async function FeedbackPage({
     hundred open items a board stops being readable anyway, and the columns
     say so rather than silently truncating.
   */
-  const [result, projects] = await Promise.all([
+  const [result, projects, vocabulary] = await Promise.all([
     listFeedback(
       context.workspaceId,
       view === 'board' ? { ...filter, page: 1, perPage: 100 } : filter,
     ),
     listProjects(context.workspaceId),
+    getVocabulary(context.workspaceId),
   ]);
 
   const pageParams = (page: number) => {
@@ -70,7 +72,11 @@ export default async function FeedbackPage({
 
       <div className="mb-3 flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
-          <FeedbackFilters projects={projects.map((p) => ({ id: p.id, name: p.name }))} />
+          <FeedbackFilters
+            projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+            statuses={vocabulary.statuses}
+            categories={vocabulary.categories}
+          />
         </div>
         <ViewSwitcher current={view} />
       </div>
@@ -91,7 +97,11 @@ export default async function FeedbackPage({
             </CardContent>
           </Card>
         ) : (
-          <FeedbackBoard items={result.items} canUpdate={can(context.role, 'feedback.update')} />
+          <FeedbackBoard
+            items={result.items}
+            statuses={vocabulary.statuses}
+            canUpdate={can(context.role, 'feedback.update')}
+          />
         )
       ) : (
         <Card>

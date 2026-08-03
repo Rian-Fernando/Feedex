@@ -36,6 +36,7 @@ type Services = {
   projects: typeof import('@/server/services/projects');
   feedback: typeof import('@/server/services/feedback');
   apiAuth: typeof import('@/server/services/api-auth');
+  labels: typeof import('@/server/services/labels');
   ids: typeof import('@/lib/ids');
 };
 
@@ -80,6 +81,8 @@ async function seedTenant(label: string): Promise<Tenant> {
     role: 'owner',
   });
 
+  await s.labels.seedWorkspaceLabels(workspaceId);
+
   const created = await s.projects.createProject(workspaceId, userId, {
     name: `${label} project`,
     environment: 'production',
@@ -122,6 +125,7 @@ beforeAll(async () => {
     projects: await import('@/server/services/projects'),
     feedback: await import('@/server/services/feedback'),
     apiAuth: await import('@/server/services/api-auth'),
+    labels: await import('@/server/services/labels'),
     ids: await import('@/lib/ids'),
   };
 
@@ -332,5 +336,70 @@ describe('onboarding status does not leak across tenants', () => {
   it('reports only the caller own project', async () => {
     const status = await s.projects.getOnboarding(alpha.workspaceId);
     expect(status.project?.id).toBe(alpha.projectId);
+  });
+});
+
+describe('the label vocabulary is per workspace', () => {
+  it('seeds each workspace with its own copy', async () => {
+    const alphaLabels = await s.labels.listLabels(alpha.workspaceId);
+    const betaLabels = await s.labels.listLabels(beta.workspaceId);
+
+    expect(alphaLabels.length).toBeGreaterThan(0);
+    expect(alphaLabels).toHaveLength(betaLabels.length);
+
+    // Same keys, different rows: renaming one workspace's status must not
+    // touch another's.
+    const alphaIds = new Set(alphaLabels.map((entry) => entry.id));
+    expect(betaLabels.some((entry) => alphaIds.has(entry.id))).toBe(false);
+  });
+
+  it('does not let one workspace rename another workspace label', async () => {
+    const betaLabels = await s.labels.listLabels(beta.workspaceId, 'status');
+    const target = betaLabels[0]!;
+
+    await expect(
+      s.labels.updateLabel(alpha.workspaceId, target.id, {
+        label: 'Hijacked',
+        tone: 'danger',
+        lifecycle: 'active',
+      }),
+    ).rejects.toThrow();
+
+    const after = await s.labels.listLabels(beta.workspaceId, 'status');
+    expect(after[0]!.label).toBe(target.label);
+  });
+
+  it('does not let one workspace delete another workspace label', async () => {
+    const created = await s.labels.createLabel(beta.workspaceId, 'status', {
+      label: 'Needs design',
+      tone: 'info',
+      lifecycle: 'active',
+    });
+
+    await expect(s.labels.deleteLabel(alpha.workspaceId, created.id, 'open')).rejects.toThrow();
+
+    const stillThere = await s.labels.listLabels(beta.workspaceId, 'status');
+    expect(stillThere.some((entry) => entry.id === created.id)).toBe(true);
+  });
+
+  it('confines a custom status to the workspace that created it', async () => {
+    const alphaStatuses = await s.labels.listLabels(alpha.workspaceId, 'status');
+    expect(alphaStatuses.some((entry) => entry.label === 'Needs design')).toBe(false);
+  });
+
+  it('refuses to move feedback into a status from another workspace', async () => {
+    // `blocked` exists nowhere; the point is that the check is against the
+    // caller's own vocabulary rather than a global list.
+    await expect(
+      s.feedback.updateFeedback(alpha.workspaceId, alpha.feedbackId, { status: 'blocked' }),
+    ).rejects.toThrow();
+  });
+
+  it('derives open and done counts from the workspace own lifecycle', async () => {
+    const vocabulary = await s.labels.getVocabulary(alpha.workspaceId);
+
+    expect(vocabulary.openStatusKeys).toContain('open');
+    expect(vocabulary.doneStatusKeys).toContain('resolved');
+    expect(vocabulary.doneStatusKeys).not.toContain('open');
   });
 });

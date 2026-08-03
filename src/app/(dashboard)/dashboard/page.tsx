@@ -22,7 +22,8 @@ import { FeedbackRow } from '@/components/dashboard/feedback-row';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/misc';
-import { FEEDBACK_CATEGORIES } from '@/lib/taxonomy';
+import { getVocabulary } from '@/server/services/labels';
+import { toneBarClass } from '@/lib/taxonomy';
 import { formatCount, percentChange } from '@/lib/format';
 import { absoluteUrl } from '@/config/site';
 
@@ -30,26 +31,19 @@ export const metadata: Metadata = {
   title: 'Overview',
 };
 
-const CATEGORY_BAR_CLASSES: Record<string, string> = {
-  bug: 'bg-danger-500',
-  feature: 'bg-accent-500',
-  ui: 'bg-info-500',
-  performance: 'bg-warning-500',
-  content: 'bg-plum-400',
-  question: 'bg-info-400',
-  other: 'bg-plum-500',
-};
-
 export default async function OverviewPage() {
   const context = await requireWorkspace();
 
-  const [stats, recent, activity, projects, onboarding] = await Promise.all([
+  const [stats, recent, activity, projects, onboarding, vocabulary] = await Promise.all([
     getWorkspaceStats(context.workspaceId),
     recentFeedback(context.workspaceId, 5),
     listActivity(context.workspaceId, 8),
     listProjects(context.workspaceId),
     getOnboarding(context.workspaceId),
+    getVocabulary(context.workspaceId),
   ]);
+
+  const categories = vocabulary.categories;
 
   const delta = percentChange(stats.last7Days, stats.previous7Days);
   const resolutionRate =
@@ -127,25 +121,26 @@ export default async function OverviewPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3 pt-4">
             <DistributionBar
-              segments={FEEDBACK_CATEGORIES.map((category) => ({
+              segments={categories.map((category) => ({
                 label: category.label,
-                value: stats.byCategory[category.value],
-                className: CATEGORY_BAR_CLASSES[category.value] ?? 'bg-plum-500',
+                value: stats.byCategory[category.key] ?? 0,
+                className: toneBarClass(category.tone),
               }))}
             />
             <ul className="flex flex-col gap-1.5">
-              {FEEDBACK_CATEGORIES.filter((category) => stats.byCategory[category.value] > 0)
-                .sort((a, b) => stats.byCategory[b.value] - stats.byCategory[a.value])
+              {categories
+                .filter((category) => (stats.byCategory[category.key] ?? 0) > 0)
+                .sort((a, b) => (stats.byCategory[b.key] ?? 0) - (stats.byCategory[a.key] ?? 0))
                 .slice(0, 5)
                 .map((category) => (
-                  <li key={category.value} className="flex items-center gap-2 text-sm">
+                  <li key={category.key} className="flex items-center gap-2 text-sm">
                     <span
                       aria-hidden
-                      className={`size-2 shrink-0 rounded-full ${CATEGORY_BAR_CLASSES[category.value]}`}
+                      className={`size-2 shrink-0 rounded-full ${toneBarClass(category.tone)}`}
                     />
                     <span className="flex-1 truncate text-fg-muted">{category.label}</span>
                     <span className="font-medium text-fg tabular-nums">
-                      {stats.byCategory[category.value]}
+                      {stats.byCategory[category.key] ?? 0}
                     </span>
                   </li>
                 ))}

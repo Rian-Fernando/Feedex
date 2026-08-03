@@ -18,6 +18,7 @@ export const ID_PREFIX = {
   attachment: 'att',
   note: 'nte',
   apiKey: 'key',
+  label: 'lbl',
   activity: 'act',
 } as const;
 

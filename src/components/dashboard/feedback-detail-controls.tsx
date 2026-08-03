@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { FEEDBACK_CATEGORIES, FEEDBACK_PRIORITIES, FEEDBACK_STATUSES } from '@/lib/taxonomy';
+import { FEEDBACK_PRIORITIES } from '@/lib/taxonomy';
 import {
   createNoteAction,
   deleteFeedbackAction,
@@ -45,11 +45,16 @@ export function TriageControls({
   status,
   priority,
   category,
+  statuses,
+  categories,
 }: {
   feedbackId: string;
   status: FeedbackStatus;
   priority: FeedbackPriority;
   category: FeedbackCategory;
+  /** The workspace's own vocabulary, in display order. */
+  statuses: Array<{ key: string; label: string }>;
+  categories: Array<{ key: string; label: string }>;
 }) {
   const router = useRouter();
   const [pending, startTransition] = React.useTransition();
@@ -91,8 +96,8 @@ export function TriageControls({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {FEEDBACK_STATUSES.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
+            {statuses.map((item) => (
+              <SelectItem key={item.key} value={item.key}>
                 {item.label}
               </SelectItem>
             ))}
@@ -129,8 +134,8 @@ export function TriageControls({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {FEEDBACK_CATEGORIES.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
+            {categories.map((item) => (
+              <SelectItem key={item.key} value={item.key}>
                 {item.label}
               </SelectItem>
             ))}

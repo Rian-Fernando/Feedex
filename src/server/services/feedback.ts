@@ -18,7 +18,8 @@ import {
 import { createId, ID_PREFIX } from '@/lib/ids';
 import { AppError } from '@/lib/errors';
 import { base64ByteLength } from '@/lib/attachments';
-import { CLOSED_STATUSES, OPEN_STATUSES, PRIORITY_WEIGHT } from '@/lib/taxonomy';
+import { PRIORITY_WEIGHT } from '@/lib/taxonomy';
+import { getVocabulary, type WorkspaceVocabulary } from '@/server/services/labels';
 import type { FeedbackFilterInput, UpdateFeedbackInput } from '@/lib/validation';
 
 /**
@@ -34,6 +35,45 @@ export interface FeedbackWithProject extends Feedback {
   projectColor: string;
   projectSlug: string;
   assigneeName: string | null;
+  /*
+    Display names and tones for this item's status and category, resolved from
+    the workspace's own vocabulary before the data leaves the server.
+
+    Attached here rather than looked up in each component because the labels are
+    per workspace now: a component doing `statusMeta(item.status)` against a
+    module-level constant would silently render the wrong name — or nothing at
+    all — the moment a team renamed a status or invented one.
+  */
+  statusLabel: string;
+  statusTone: string;
+  categoryLabel: string;
+  categoryTone: string;
+}
+
+/** Attaches display labels to rows fetched from the database. */
+function decorate<T extends Feedback>(
+  rows: T[],
+  vocabulary: WorkspaceVocabulary,
+): Array<
+  T & Pick<FeedbackWithProject, 'statusLabel' | 'statusTone' | 'categoryLabel' | 'categoryTone'>
+> {
+  const statuses = new Map(vocabulary.statuses.map((entry) => [entry.key, entry]));
+  const categories = new Map(vocabulary.categories.map((entry) => [entry.key, entry]));
+
+  return rows.map((row) => {
+    const status = statuses.get(row.status);
+    const category = categories.get(row.category);
+
+    return {
+      ...row,
+      // A key with no matching label means the label was deleted out from under
+      // the row. Showing the raw key beats showing nothing.
+      statusLabel: status?.label ?? row.status,
+      statusTone: status?.tone ?? 'neutral',
+      categoryLabel: category?.label ?? row.category,
+      categoryTone: category?.tone ?? 'neutral',
+    };
+  });
 }
 
 export interface PaginatedFeedback {
@@ -114,15 +154,19 @@ export async function listFeedback(
   ]);
 
   const total = totals[0]?.value ?? 0;
+  const vocabulary = await getVocabulary(workspaceId);
 
   return {
-    items: items.map((row) => ({
-      ...row.feedback,
-      projectName: row.projectName,
-      projectColor: row.projectColor,
-      projectSlug: row.projectSlug,
-      assigneeName: row.assigneeName,
-    })),
+    items: decorate(
+      items.map((row) => ({
+        ...row.feedback,
+        projectName: row.projectName,
+        projectColor: row.projectColor,
+        projectSlug: row.projectSlug,
+        assigneeName: row.assigneeName,
+      })),
+      vocabulary,
+    ),
     total,
     page: filter.page,
     perPage: filter.perPage,
@@ -158,13 +202,20 @@ export async function getFeedback(
   const row = rows[0];
   if (!row) return null;
 
-  return {
-    ...row.feedback,
-    projectName: row.projectName,
-    projectColor: row.projectColor,
-    projectSlug: row.projectSlug,
-    assigneeName: row.assigneeName,
-  };
+  const vocabulary = await getVocabulary(workspaceId);
+
+  return decorate(
+    [
+      {
+        ...row.feedback,
+        projectName: row.projectName,
+        projectColor: row.projectColor,
+        projectSlug: row.projectSlug,
+        assigneeName: row.assigneeName,
+      },
+    ],
+    vocabulary,
+  )[0]!;
 }
 
 /* ------------------------------- Ingestion -------------------------------- */
@@ -303,8 +354,26 @@ export async function updateFeedback(
   if (!current) throw AppError.notFound('Feedback not found.');
 
   const nextStatus = input.status ?? current.status;
-  const isNowClosed = CLOSED_STATUSES.includes(nextStatus);
-  const wasClosed = CLOSED_STATUSES.includes(current.status);
+
+  /*
+    "Finished" is a property of the workspace's own status list, not of the
+    name. A team that renames Resolved, or adds "Won't fix" as a done status,
+    must still get `resolved_at` stamped correctly — otherwise its metrics
+    drift the moment it customises anything.
+  */
+  const vocabulary = await getVocabulary(workspaceId);
+
+  if (input.status && !vocabulary.statuses.some((entry) => entry.key === input.status)) {
+    throw AppError.validation('That status does not exist in this workspace.');
+  }
+
+  if (input.category && !vocabulary.categories.some((entry) => entry.key === input.category)) {
+    throw AppError.validation('That category does not exist in this workspace.');
+  }
+
+  const doneKeys = new Set(vocabulary.doneStatusKeys);
+  const isNowClosed = doneKeys.has(nextStatus);
+  const wasClosed = doneKeys.has(current.status);
 
   const rows = await db
     .update(feedback)
@@ -534,32 +603,30 @@ export async function getWorkspaceStats(workspaceId: string): Promise<WorkspaceS
       .orderBy(sql`date_trunc('day', ${feedback.createdAt})`),
   ]);
 
-  const byStatus = emptyRecord<FeedbackStatus>([
-    'open',
-    'in_progress',
-    'testing',
-    'resolved',
-    'closed',
-  ]);
+  /*
+    Seeded from this workspace's labels so a status with no feedback still shows
+    up as zero rather than being absent, and a custom one is counted at all.
+  */
+  const vocabulary = await getVocabulary(workspaceId);
+
+  const byStatus = emptyRecord<FeedbackStatus>(vocabulary.statuses.map((entry) => entry.key));
   for (const row of statusRows) byStatus[row.status] = row.value;
 
-  const byCategory = emptyRecord<FeedbackCategory>([
-    'bug',
-    'feature',
-    'ui',
-    'performance',
-    'content',
-    'question',
-    'other',
-  ]);
+  const byCategory = emptyRecord<FeedbackCategory>(vocabulary.categories.map((entry) => entry.key));
   for (const row of categoryRows) byCategory[row.category] = row.value;
 
   const byPriority = emptyRecord<FeedbackPriority>(['low', 'medium', 'high', 'critical']);
   for (const row of priorityRows) byPriority[row.priority] = row.value;
 
   const totalFeedback = Object.values(byStatus).reduce((sum, value) => sum + value, 0);
-  const openFeedback = OPEN_STATUSES.reduce((sum, status) => sum + byStatus[status], 0);
-  const resolvedFeedback = CLOSED_STATUSES.reduce((sum, status) => sum + byStatus[status], 0);
+  const openFeedback = vocabulary.openStatusKeys.reduce(
+    (sum, status) => sum + (byStatus[status] ?? 0),
+    0,
+  );
+  const resolvedFeedback = vocabulary.doneStatusKeys.reduce(
+    (sum, status) => sum + (byStatus[status] ?? 0),
+    0,
+  );
 
   const trendMap = new Map(trendRows.map((row) => [row.day, row.value]));
   const trend: Array<{ date: string; count: number }> = [];
@@ -616,6 +683,7 @@ export async function searchFeedback(
 }
 
 /** Statuses considered open, exported for callers that build their own queries. */
-export function openStatusFilter() {
-  return inArray(feedback.status, [...OPEN_STATUSES]);
+export async function openStatusFilter(workspaceId: string) {
+  const { openStatusKeys } = await getVocabulary(workspaceId);
+  return inArray(feedback.status, openStatusKeys.length ? openStatusKeys : ['']);
 }

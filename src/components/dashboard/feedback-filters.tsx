@@ -7,7 +7,7 @@ import { Search, X } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/field';
-import { FEEDBACK_CATEGORIES, FEEDBACK_PRIORITIES, FEEDBACK_STATUSES } from '@/lib/taxonomy';
+import { FEEDBACK_PRIORITIES } from '@/lib/taxonomy';
 
 /**
  * Filter bar for the feedback list.
@@ -17,7 +17,21 @@ import { FEEDBACK_CATEGORIES, FEEDBACK_PRIORITIES, FEEDBACK_STATUSES } from '@/l
  * resets pagination, because staying on page 4 of a narrower result set is
  * almost never what the user meant.
  */
-export function FeedbackFilters({ projects }: { projects: Array<{ id: string; name: string }> }) {
+/** A status or category as the workspace has defined it. */
+export interface FilterLabel {
+  key: string;
+  label: string;
+}
+
+export function FeedbackFilters({
+  projects,
+  statuses,
+  categories,
+}: {
+  projects: Array<{ id: string; name: string }>;
+  statuses: FilterLabel[];
+  categories: FilterLabel[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -89,8 +103,8 @@ export function FeedbackFilters({ projects }: { projects: Array<{ id: string; na
         className="w-auto min-w-32"
       >
         <option value="">All statuses</option>
-        {FEEDBACK_STATUSES.map((status) => (
-          <option key={status.value} value={status.value}>
+        {statuses.map((status) => (
+          <option key={status.key} value={status.key}>
             {status.label}
           </option>
         ))}
@@ -103,8 +117,8 @@ export function FeedbackFilters({ projects }: { projects: Array<{ id: string; na
         className="w-auto min-w-36"
       >
         <option value="">All categories</option>
-        {FEEDBACK_CATEGORIES.map((category) => (
-          <option key={category.value} value={category.value}>
+        {categories.map((category) => (
+          <option key={category.key} value={category.key}>
             {category.label}
           </option>
         ))}

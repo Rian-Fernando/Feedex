@@ -4,6 +4,8 @@ import { Database } from 'lucide-react';
 import { can, requireWorkspace } from '@/lib/auth';
 import { databaseDriver } from '@/lib/db';
 import { getWorkspace, listMembers } from '@/server/services/workspaces';
+import { getVocabulary } from '@/server/services/labels';
+import { LabelManager } from '@/components/dashboard/label-manager';
 import { PageHeader } from '@/components/dashboard/shell';
 import {
   AppearanceForm,
@@ -24,9 +26,10 @@ export const metadata: Metadata = {
 export default async function SettingsPage() {
   const context = await requireWorkspace();
 
-  const [workspace, members] = await Promise.all([
+  const [workspace, members, vocabulary] = await Promise.all([
     getWorkspace(context.workspaceId),
     listMembers(context.workspaceId),
+    getVocabulary(context.workspaceId),
   ]);
 
   const canEditWorkspace = can(context.role, 'workspace.update');
@@ -40,6 +43,7 @@ export default async function SettingsPage() {
         <TabsList>
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="workspace">Workspace</TabsTrigger>
+          <TabsTrigger value="labels">Statuses &amp; categories</TabsTrigger>
           <TabsTrigger value="members">Members</TabsTrigger>
         </TabsList>
 
@@ -47,6 +51,19 @@ export default async function SettingsPage() {
           <ProfileForm user={{ name: context.user.name, email: context.user.email }} />
           <AppearanceForm />
           <PasswordForm />
+        </TabsContent>
+
+        <TabsContent value="labels" className="flex max-w-3xl flex-col gap-4 pt-6">
+          <LabelManager
+            kind="status"
+            labels={vocabulary.statuses}
+            canManage={can(context.role, 'project.update')}
+          />
+          <LabelManager
+            kind="category"
+            labels={vocabulary.categories}
+            canManage={can(context.role, 'project.update')}
+          />
         </TabsContent>
 
         <TabsContent value="workspace" className="flex max-w-2xl flex-col gap-4 pt-6">

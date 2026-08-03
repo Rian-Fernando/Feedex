@@ -34,7 +34,7 @@ import {
 import { Switch } from '@/components/ui/misc';
 import { ColorPicker } from '@/components/ui/color-picker';
 import { WidgetPreview } from '@/components/dashboard/widget-preview';
-import { FEEDBACK_CATEGORIES, PROJECT_ENVIRONMENTS, PROJECT_STATUSES } from '@/lib/taxonomy';
+import { PROJECT_ENVIRONMENTS, PROJECT_STATUSES } from '@/lib/taxonomy';
 import { MAX_ATTACHMENTS } from '@/lib/attachments';
 import {
   deleteProjectAction,
@@ -42,7 +42,7 @@ import {
   updateWidgetSettingsAction,
 } from '@/server/actions/projects';
 import type { ActionResult } from '@/lib/errors';
-import type { FeedbackCategory, Project, WidgetSettings } from '@/lib/db/schema';
+import type { Project, WidgetSettings } from '@/lib/db/schema';
 
 const INITIAL: ActionResult = { ok: false };
 
@@ -160,7 +160,14 @@ function resolveSettings(project: Project): Required<WidgetSettings> {
   };
 }
 
-export function WidgetSettingsForm({ project }: { project: Project }) {
+export function WidgetSettingsForm({
+  project,
+  categories: available,
+}: {
+  project: Project;
+  /** The workspace's categories — this is the set a project may pick from. */
+  categories: Array<{ key: string; label: string }>;
+}) {
   const router = useRouter();
   const action = updateWidgetSettingsAction.bind(null, project.id);
   const [state, formAction, pending] = React.useActionState(action, INITIAL);
@@ -176,7 +183,7 @@ export function WidgetSettingsForm({ project }: { project: Project }) {
   const set = <K extends keyof WidgetSettings>(key: K, value: Required<WidgetSettings>[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
 
-  const toggleCategory = (value: FeedbackCategory) =>
+  const toggleCategory = (value: string) =>
     setDraft((current) => ({
       ...current,
       categories: current.categories.includes(value)
@@ -323,21 +330,22 @@ export function WidgetSettingsForm({ project }: { project: Project }) {
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-1 text-sm font-medium text-fg">Categories</legend>
               <p className="mb-1 text-xs text-fg-subtle">
-                Which options the reporter can choose from, in this order. Turn off anything your
-                project does not want to hear about.
+                Which options the reporter can choose from, in this order. Turn off anything this
+                project does not want to hear about. The list itself is defined for the whole
+                workspace under Settings → Statuses &amp; categories.
               </p>
               <div className="flex flex-wrap gap-2">
-                {FEEDBACK_CATEGORIES.map((category) => (
+                {available.map((category) => (
                   <label
-                    key={category.value}
+                    key={category.key}
                     className="flex cursor-pointer items-center gap-2 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-fg-muted transition-colors hover:border-line-strong has-checked:border-accent-500 has-checked:bg-accent-500/10 has-checked:text-accent-500"
                   >
                     <input
                       type="checkbox"
                       name="categories"
-                      value={category.value}
-                      checked={draft.categories.includes(category.value)}
-                      onChange={() => toggleCategory(category.value)}
+                      value={category.key}
+                      checked={draft.categories.includes(category.key)}
+                      onChange={() => toggleCategory(category.key)}
                       className="sr-only"
                     />
                     {category.label}

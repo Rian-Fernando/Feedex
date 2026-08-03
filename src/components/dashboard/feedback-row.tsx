@@ -3,7 +3,7 @@ import { Globe, Monitor, Smartphone, Tablet } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/badge';
-import { categoryMeta, priorityMeta, statusMeta } from '@/lib/taxonomy';
+import { asTone, priorityMeta } from '@/lib/taxonomy';
 import { displayUrl, timeAgo, truncate } from '@/lib/format';
 import type { FeedbackWithProject } from '@/server/services/feedback';
 
@@ -28,8 +28,6 @@ export function FeedbackRow({
   showProject?: boolean;
   className?: string;
 }) {
-  const category = categoryMeta(item.category);
-  const status = statusMeta(item.status);
   const priority = priorityMeta(item.priority);
   const DeviceIcon = item.context.device ? DEVICE_ICONS[item.context.device] : null;
 
@@ -63,11 +61,11 @@ export function FeedbackRow({
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5 pl-4.5">
-        <Badge tone={status.tone} size="sm" dot>
-          {status.label}
+        <Badge tone={asTone(item.statusTone)} size="sm" dot>
+          {item.statusLabel}
         </Badge>
-        <Badge tone={category.tone} size="sm">
-          {category.label}
+        <Badge tone={asTone(item.categoryTone)} size="sm">
+          {item.categoryLabel}
         </Badge>
         {item.priority !== 'medium' ? (
           <Badge tone={priority.tone} size="sm">

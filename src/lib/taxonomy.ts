@@ -1,15 +1,16 @@
-import type {
-  FeedbackCategory,
-  FeedbackPriority,
-  FeedbackStatus,
-  ProjectEnvironment,
-  ProjectStatus,
-} from '@/lib/db/schema';
+import type { FeedbackPriority, ProjectEnvironment, ProjectStatus } from '@/lib/db/schema';
 
 /**
- * Display metadata for the domain enums.
+ * Display metadata for the enums that are still fixed.
  *
- * The database owns the values; this module owns how they are named, ordered,
+ * Statuses and categories used to live here too. They are workspace-defined
+ * now and come from `workspace_labels`, so keeping a copy of the old lists
+ * around would be a second source of truth that is wrong for any workspace
+ * that has customised anything.
+ *
+ * What remains are the genuinely fixed dimensions — priority, project
+ * environment, project status. The database owns the values; this module owns
+ * how they are named, ordered,
  * and coloured. Keeping it in one place means the dashboard, the widget, the
  * public API documentation, and the seed data cannot drift apart.
  *
@@ -22,79 +23,6 @@ export interface TaxonomyEntry<T extends string> {
   description: string;
   tone: 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent';
 }
-
-export const FEEDBACK_CATEGORIES: readonly TaxonomyEntry<FeedbackCategory>[] = [
-  {
-    value: 'bug',
-    label: 'Bug',
-    description: 'Something is broken or behaving incorrectly.',
-    tone: 'danger',
-  },
-  {
-    value: 'feature',
-    label: 'Feature request',
-    description: 'A capability that does not exist yet.',
-    tone: 'accent',
-  },
-  {
-    value: 'ui',
-    label: 'UI issue',
-    description: 'Layout, spacing, contrast, or visual polish.',
-    tone: 'info',
-  },
-  {
-    value: 'performance',
-    label: 'Performance',
-    description: 'Slow loads, jank, or excessive resource use.',
-    tone: 'warning',
-  },
-  {
-    value: 'content',
-    label: 'Content',
-    description: 'Copy errors, stale information, or broken links.',
-    tone: 'neutral',
-  },
-  {
-    value: 'question',
-    label: 'Question',
-    description: 'The reporter needs help or clarification.',
-    tone: 'info',
-  },
-  {
-    value: 'other',
-    label: 'Other',
-    description: 'Anything that does not fit the categories above.',
-    tone: 'neutral',
-  },
-] as const;
-
-export const FEEDBACK_STATUSES: readonly TaxonomyEntry<FeedbackStatus>[] = [
-  { value: 'open', label: 'Open', description: 'Triaged but not started.', tone: 'info' },
-  {
-    value: 'in_progress',
-    label: 'In progress',
-    description: 'Actively being worked on.',
-    tone: 'accent',
-  },
-  {
-    value: 'testing',
-    label: 'Testing',
-    description: 'Fixed and awaiting verification.',
-    tone: 'warning',
-  },
-  {
-    value: 'resolved',
-    label: 'Resolved',
-    description: 'Shipped and confirmed working.',
-    tone: 'success',
-  },
-  {
-    value: 'closed',
-    label: 'Closed',
-    description: 'No further action will be taken.',
-    tone: 'neutral',
-  },
-] as const;
 
 export const FEEDBACK_PRIORITIES: readonly TaxonomyEntry<FeedbackPriority>[] = [
   { value: 'low', label: 'Low', description: 'Nice to have.', tone: 'neutral' },
@@ -140,12 +68,6 @@ export const PROJECT_STATUSES: readonly TaxonomyEntry<ProjectStatus>[] = [
   },
 ] as const;
 
-/** Statuses that count as "still needs attention" in dashboard metrics. */
-export const OPEN_STATUSES: readonly FeedbackStatus[] = ['open', 'in_progress', 'testing'];
-
-/** Statuses that count as "done". */
-export const CLOSED_STATUSES: readonly FeedbackStatus[] = ['resolved', 'closed'];
-
 function lookup<T extends string>(
   entries: readonly TaxonomyEntry<T>[],
 ): (value: T) => TaxonomyEntry<T> {
@@ -153,8 +75,6 @@ function lookup<T extends string>(
   return (value: T) => map.get(value) ?? entries[entries.length - 1]!;
 }
 
-export const categoryMeta = lookup(FEEDBACK_CATEGORIES);
-export const statusMeta = lookup(FEEDBACK_STATUSES);
 export const priorityMeta = lookup(FEEDBACK_PRIORITIES);
 export const environmentMeta = lookup(PROJECT_ENVIRONMENTS);
 export const projectStatusMeta = lookup(PROJECT_STATUSES);
@@ -166,3 +86,48 @@ export const PRIORITY_WEIGHT: Record<FeedbackPriority, number> = {
   medium: 2,
   low: 1,
 };
+
+/**
+ * Maps a label's tone onto a solid background class.
+ *
+ * Used where a coloured dot or bar segment stands in for a label — the
+ * distribution bar on the overview, and the legend beside it. Tones are a
+ * closed set, so an unknown value falling back to plum is a defensive default
+ * rather than an expected path.
+ */
+export function toneBarClass(tone: string): string {
+  switch (tone) {
+    case 'danger':
+      return 'bg-danger-500';
+    case 'accent':
+      return 'bg-accent-500';
+    case 'info':
+      return 'bg-info-500';
+    case 'warning':
+      return 'bg-warning-500';
+    case 'success':
+      return 'bg-success-500';
+    default:
+      return 'bg-plum-500';
+  }
+}
+
+/**
+ * Narrows a stored tone string to the Badge component's union.
+ *
+ * Tones come out of the database as text, because a workspace label's tone is
+ * data. The set is closed and validated on write, so this is a type bridge
+ * with a defensive fallback rather than real branching.
+ */
+export function asTone(tone: string): import('@/components/ui/badge').BadgeTone {
+  switch (tone) {
+    case 'info':
+    case 'accent':
+    case 'success':
+    case 'warning':
+    case 'danger':
+      return tone;
+    default:
+      return 'neutral';
+  }
+}

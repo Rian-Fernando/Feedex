@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -47,6 +48,20 @@ export const feedbackStatus = pgEnum('feedback_status', [
 export const feedbackPriority = pgEnum('feedback_priority', ['low', 'medium', 'high', 'critical']);
 
 export const apiKeyType = pgEnum('api_key_type', ['public', 'secret']);
+
+export const labelKind = pgEnum('label_kind', ['status', 'category']);
+
+/**
+ * Which side of "done" a status sits on.
+ *
+ * This is the load-bearing part of letting teams invent their own statuses. A
+ * name is just a name, but every metric in the product — open counts, the
+ * resolved total, the default filter, whether `resolved_at` gets stamped — is
+ * really asking "is this finished?". Attaching that to the label instead of
+ * hard-coding a list of names means a workspace can add "Needs design" or
+ * rename "Testing" to "QA" without silently corrupting its own numbers.
+ */
+export const labelLifecycle = pgEnum('label_lifecycle', ['active', 'done']);
 
 export const activityAction = pgEnum('activity_action', [
   'workspace.created',
@@ -178,6 +193,59 @@ export const workspaceMembers = pgTable(
   ],
 );
 
+/**
+ * A workspace's own names for statuses and categories.
+ *
+ * Feedback used to carry Postgres enums, which meant the workflow was whatever
+ * Feedex decided it was. A team that works in "Needs design" or wants to drop
+ * "Question" entirely had no way to say so, and adding a value meant a
+ * migration and a deploy.
+ *
+ * The vocabulary is per workspace rather than per project so that the combined
+ * inbox stays coherent — a board whose columns changed depending on which
+ * project you filtered to would be unreadable. Projects then choose which
+ * *categories* they offer reporters, which is the part that genuinely differs
+ * between a portfolio and an API.
+ *
+ * `key` is the stable identifier written onto feedback rows and is never
+ * changed after creation; `label` is what people see and can be renamed freely.
+ * That split is what makes renaming "Testing" to "QA" a display change rather
+ * than a data migration.
+ */
+export const workspaceLabels = pgTable(
+  'workspace_labels',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    kind: labelKind('kind').notNull(),
+    /** Stable slug stored on feedback rows. Immutable once created. */
+    key: varchar('key', { length: 32 }).notNull(),
+    label: varchar('label', { length: 48 }).notNull(),
+    /** Badge tone, from the design system's fixed set. */
+    tone: varchar('tone', { length: 16 }).notNull().default('neutral'),
+    /**
+     * Statuses only. Decides whether an item counts as open or done, so metrics
+     * keep working across renames and additions.
+     */
+    lifecycle: labelLifecycle('lifecycle').notNull().default('active'),
+    /** Display order, and column order on the board. */
+    position: integer('position').notNull().default(0),
+    /**
+     * Built-in labels may be renamed and reordered but not deleted, because
+     * ingestion falls back to them and existing rows point at them.
+     */
+    isSystem: boolean('is_system').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('workspace_labels_unique').on(table.workspaceId, table.kind, table.key),
+    index('workspace_labels_workspace_kind_idx').on(table.workspaceId, table.kind, table.position),
+  ],
+);
+
 /* -------------------------------------------------------------------------- */
 /*                                  Projects                                  */
 /* -------------------------------------------------------------------------- */
@@ -265,8 +333,18 @@ export const feedback = pgTable(
     title: varchar('title', { length: 200 }).notNull(),
     description: text('description').notNull(),
 
-    category: feedbackCategory('category').notNull().default('other'),
-    status: feedbackStatus('status').notNull().default('open'),
+    /*
+      Label keys rather than enums. The set of valid values is now per
+      workspace and editable at runtime, which a Postgres enum cannot express —
+      it is global, and widening one takes a migration and a deploy.
+
+      Referential integrity is enforced in the service layer rather than by a
+      foreign key: ingestion has to accept a report even if the project's
+      category list changed a moment ago, and falling back to a default beats
+      rejecting somebody's bug report over a race.
+    */
+    category: varchar('category', { length: 32 }).notNull().default('other'),
+    status: varchar('status', { length: 32 }).notNull().default('open'),
     priority: feedbackPriority('priority').notNull().default('medium'),
 
     reporterEmail: varchar('reporter_email', { length: 320 }),
@@ -460,7 +538,7 @@ export interface UserPreferences {
 export interface WorkspaceSettings {
   defaultPriority?: (typeof feedbackPriority.enumValues)[number];
   defaultEnvironment?: (typeof projectEnvironment.enumValues)[number];
-  defaultCategories?: (typeof feedbackCategory.enumValues)[number][];
+  defaultCategories?: string[];
 }
 
 /**
@@ -485,7 +563,7 @@ export interface WidgetSettings {
    * Which categories the reporter may pick from, in display order. A project
    * that only wants UI and feature reports lists exactly those two.
    */
-  categories?: (typeof feedbackCategory.enumValues)[number][];
+  categories?: string[];
   theme?: 'light' | 'dark' | 'auto';
   /** Whether the reporter may attach screenshots or files. */
   attachmentsEnabled?: boolean;
@@ -533,8 +611,23 @@ export type FeedbackNote = typeof feedbackNotes.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 
 export type WorkspaceRole = (typeof workspaceRole.enumValues)[number];
-export type FeedbackCategory = (typeof feedbackCategory.enumValues)[number];
-export type FeedbackStatus = (typeof feedbackStatus.enumValues)[number];
+/*
+  Statuses and categories are workspace-defined, so these are plain strings at
+  the type level. The built-in keys stay enumerated below because ingestion
+  defaults to them and the seed creates them for every workspace — but a value
+  read from the database may legitimately be a key this build has never seen.
+*/
+export type FeedbackCategory = string;
+export type FeedbackStatus = string;
+
+/** Keys every workspace starts with. Kept as enums for exhaustive defaults. */
+export type BuiltInCategory = (typeof feedbackCategory.enumValues)[number];
+export type BuiltInStatus = (typeof feedbackStatus.enumValues)[number];
+
+export type WorkspaceLabel = typeof workspaceLabels.$inferSelect;
+export type NewWorkspaceLabel = typeof workspaceLabels.$inferInsert;
+export type LabelKind = (typeof labelKind.enumValues)[number];
+export type LabelLifecycle = (typeof labelLifecycle.enumValues)[number];
 export type FeedbackPriority = (typeof feedbackPriority.enumValues)[number];
 export type ProjectEnvironment = (typeof projectEnvironment.enumValues)[number];
 export type ProjectStatus = (typeof projectStatus.enumValues)[number];

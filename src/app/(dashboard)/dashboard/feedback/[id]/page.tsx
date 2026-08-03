@@ -16,6 +16,7 @@ import {
 
 import { requireWorkspace } from '@/lib/auth';
 import { getFeedback, listAttachments, listNotes } from '@/server/services/feedback';
+import { getVocabulary } from '@/server/services/labels';
 import { formatBytes, isInlineImage } from '@/lib/attachments';
 import { PageHeader } from '@/components/dashboard/shell';
 import {
@@ -26,7 +27,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { categoryMeta, priorityMeta, statusMeta } from '@/lib/taxonomy';
+import { asTone, priorityMeta } from '@/lib/taxonomy';
 import { formatDateTime, timeAgo, truncate } from '@/lib/format';
 
 export async function generateMetadata({
@@ -48,13 +49,12 @@ export default async function FeedbackDetailPage({ params }: { params: Promise<{
   const item = await getFeedback(context.workspaceId, id);
   if (!item) notFound();
 
-  const [notes, attachments] = await Promise.all([
+  const [notes, attachments, vocabulary] = await Promise.all([
     listNotes(context.workspaceId, id),
     listAttachments(context.workspaceId, id),
+    getVocabulary(context.workspaceId),
   ]);
 
-  const status = statusMeta(item.status);
-  const category = categoryMeta(item.category);
   const priority = priorityMeta(item.priority);
   const DeviceIcon = item.context.device ? DEVICE_ICONS[item.context.device] : null;
 
@@ -124,10 +124,10 @@ export default async function FeedbackDetailPage({ params }: { params: Promise<{
               </p>
 
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                <Badge tone={status.tone} dot>
-                  {status.label}
+                <Badge tone={asTone(item.statusTone)} dot>
+                  {item.statusLabel}
                 </Badge>
-                <Badge tone={category.tone}>{category.label}</Badge>
+                <Badge tone={asTone(item.categoryTone)}>{item.categoryLabel}</Badge>
                 <Badge tone={priority.tone}>{priority.label} priority</Badge>
                 {item.tags.map((tag) => (
                   <Badge key={tag} tone="neutral" size="sm">
@@ -244,6 +244,8 @@ export default async function FeedbackDetailPage({ params }: { params: Promise<{
                 status={item.status}
                 priority={item.priority}
                 category={item.category}
+                statuses={vocabulary.statuses}
+                categories={vocabulary.categories}
               />
             </CardContent>
           </Card>

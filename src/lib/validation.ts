@@ -1,12 +1,6 @@
 import { z } from 'zod';
 
-import {
-  feedbackCategory,
-  feedbackPriority,
-  feedbackStatus,
-  projectEnvironment,
-  projectStatus,
-} from '@/lib/db/schema';
+import { feedbackPriority, projectEnvironment, projectStatus } from '@/lib/db/schema';
 import {
   MAX_ATTACHMENTS,
   MAX_ATTACHMENTS_TOTAL_BYTES,
@@ -127,9 +121,29 @@ export const widgetSettingsSchema = z.object({
   attachmentsEnabled: z.boolean().default(true),
   theme: z.enum(['light', 'dark', 'auto']).default('auto'),
   categories: z
-    .array(z.enum(feedbackCategory.enumValues))
+    .array(z.string().max(32))
     .min(1, 'Enable at least one category.')
     .default(['bug', 'feature', 'ui', 'other']),
+});
+
+/**
+ * A workspace-defined status or category.
+ *
+ * `tone` is constrained to the design system's badge tones rather than a free
+ * colour: a label has to stay legible in both themes and next to the others,
+ * and an arbitrary hex would let a workspace make its own board unreadable.
+ */
+export const labelSchema = z.object({
+  label: requiredText(1, 48, 'Label'),
+  tone: z.enum(['neutral', 'info', 'accent', 'success', 'warning', 'danger']).default('neutral'),
+  /** Statuses only; categories are always stored as `active`. */
+  lifecycle: z.enum(['active', 'done']).default('active'),
+});
+
+export type LabelInput = z.infer<typeof labelSchema>;
+
+export const reorderLabelsSchema = z.object({
+  ids: z.array(z.string().max(64)).max(48),
 });
 
 export const createProjectSchema = z.object({
@@ -206,7 +220,7 @@ export const attachmentSchema = z.object({
 
 export const submitFeedbackSchema = z.object({
   publicKey: z.string().min(8).max(128),
-  category: z.enum(feedbackCategory.enumValues).default('other'),
+  category: z.string().max(32).default('other'),
   title: sanitizedText(200).optional(),
   description: requiredText(5, 5000, 'Description'),
   email: emailSchema.optional().or(z.literal('')),
@@ -227,9 +241,14 @@ export const submitFeedbackSchema = z.object({
 
 export const updateFeedbackSchema = z.object({
   title: requiredText(3, 200, 'Title').optional(),
-  status: z.enum(feedbackStatus.enumValues).optional(),
+  /*
+    Bounded strings rather than enums: the valid set is per workspace and lives
+    in the database now. The service layer checks the value against that
+    workspace's vocabulary, which is the only place that can know it.
+  */
+  status: z.string().max(32).optional(),
   priority: z.enum(feedbackPriority.enumValues).optional(),
-  category: z.enum(feedbackCategory.enumValues).optional(),
+  category: z.string().max(32).optional(),
   assignedToId: z.string().max(64).nullable().optional(),
   tags: z.array(sanitizedText(32)).max(12).optional(),
 });
@@ -241,9 +260,9 @@ export const createNoteSchema = z.object({
 /** Query parameters for the feedback list view and the REST API. */
 export const feedbackFilterSchema = z.object({
   projectId: z.string().max(64).optional(),
-  status: z.enum(feedbackStatus.enumValues).optional(),
+  status: z.string().max(32).optional(),
   priority: z.enum(feedbackPriority.enumValues).optional(),
-  category: z.enum(feedbackCategory.enumValues).optional(),
+  category: z.string().max(32).optional(),
   q: z.string().trim().max(200).optional(),
   sort: z.enum(['newest', 'oldest', 'priority']).default('newest'),
   /** Accepted so the view toggle survives `safeParse`; the page reads it directly. */

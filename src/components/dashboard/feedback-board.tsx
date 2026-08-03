@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/cn';
 import { Badge } from '@/components/ui/badge';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
-import { FEEDBACK_STATUSES, categoryMeta, priorityMeta } from '@/lib/taxonomy';
+import { asTone, priorityMeta } from '@/lib/taxonomy';
 import { timeAgo } from '@/lib/format';
 import { updateFeedbackAction } from '@/server/actions/feedback';
 import type { FeedbackWithProject } from '@/server/services/feedback';
@@ -37,6 +37,8 @@ import type { FeedbackStatus } from '@/lib/db/schema';
 
 export interface FeedbackBoardProps {
   items: FeedbackWithProject[];
+  /** The workspace's own statuses, in display order. One column each. */
+  statuses: Array<{ id: string; key: string; label: string; tone: string }>;
   /** Whether the signed-in member may actually move cards. */
   canUpdate: boolean;
 }
@@ -44,7 +46,7 @@ export interface FeedbackBoardProps {
 /** Cards rendered per column before the rest are summarised. */
 const COLUMN_LIMIT = 50;
 
-export function FeedbackBoard({ items, canUpdate }: FeedbackBoardProps) {
+export function FeedbackBoard({ items, statuses, canUpdate }: FeedbackBoardProps) {
   const router = useRouter();
 
   const [dragging, setDragging] = React.useState<string | null>(null);
@@ -87,9 +89,9 @@ export function FeedbackBoard({ items, canUpdate }: FeedbackBoardProps) {
     [canUpdate, applyMove, router],
   );
 
-  const columns = FEEDBACK_STATUSES.map((status) => ({
+  const columns = statuses.map((status) => ({
     ...status,
-    items: optimistic.filter((item) => item.status === status.value),
+    items: optimistic.filter((item) => item.status === status.key),
   }));
 
   return (
@@ -100,33 +102,33 @@ export function FeedbackBoard({ items, canUpdate }: FeedbackBoardProps) {
 
         return (
           <section
-            key={column.value}
+            key={column.key}
             aria-label={`${column.label}, ${column.items.length} items`}
             onDragOver={(event) => {
               if (!canUpdate || !dragging) return;
               // Without this the drop never fires: the default handling of
               // dragover is to reject the drop.
               event.preventDefault();
-              setOver(column.value);
+              setOver(column.key);
             }}
-            onDragLeave={() => setOver((current) => (current === column.value ? null : current))}
+            onDragLeave={() => setOver((current) => (current === column.key ? null : current))}
             onDrop={(event) => {
               event.preventDefault();
               setOver(null);
               const id = event.dataTransfer.getData('text/plain');
               const item = optimistic.find((entry) => entry.id === id);
-              if (item) move(item, column.value);
+              if (item) move(item, column.key);
             }}
             className={cn(
               'flex w-[17.5rem] shrink-0 snap-start flex-col rounded-xl border transition-colors',
-              over === column.value
+              over === column.key
                 ? 'border-accent-500 bg-accent-500/5'
                 : 'border-line-subtle bg-surface-sunken/40',
             )}
           >
             <header className="flex items-center justify-between gap-2 px-3 py-2.5">
               <div className="flex items-center gap-2">
-                <Badge tone={column.tone} dot size="sm">
+                <Badge tone={asTone(column.tone)} dot size="sm">
                   {column.label}
                 </Badge>
               </div>
@@ -140,6 +142,7 @@ export function FeedbackBoard({ items, canUpdate }: FeedbackBoardProps) {
                 <BoardCard
                   key={item.id}
                   item={item}
+                  statuses={statuses}
                   status={item.status}
                   canUpdate={canUpdate}
                   dragging={dragging === item.id}
@@ -175,6 +178,7 @@ export function FeedbackBoard({ items, canUpdate }: FeedbackBoardProps) {
 
 interface BoardCardProps {
   item: FeedbackWithProject;
+  statuses: FeedbackBoardProps['statuses'];
   status: FeedbackStatus;
   canUpdate: boolean;
   dragging: boolean;
@@ -185,6 +189,7 @@ interface BoardCardProps {
 
 function BoardCard({
   item,
+  statuses,
   status,
   canUpdate,
   dragging,
@@ -192,7 +197,6 @@ function BoardCard({
   onDragEnd,
   onMove,
 }: BoardCardProps) {
-  const category = categoryMeta(item.category);
   const priority = priorityMeta(item.priority);
 
   return (
@@ -229,19 +233,21 @@ function BoardCard({
             </MenuTrigger>
 
             <MenuContent align="end" className="w-44">
-              {FEEDBACK_STATUSES.filter((entry) => entry.value !== status).map((entry) => (
-                <MenuItem key={entry.value} onSelect={() => onMove(entry.value)}>
-                  Move to {entry.label.toLowerCase()}
-                </MenuItem>
-              ))}
+              {statuses
+                .filter((entry) => entry.key !== status)
+                .map((entry) => (
+                  <MenuItem key={entry.key} onSelect={() => onMove(entry.key)}>
+                    Move to {entry.label.toLowerCase()}
+                  </MenuItem>
+                ))}
             </MenuContent>
           </Menu>
         ) : null}
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <Badge tone={category.tone} size="sm">
-          {category.label}
+        <Badge tone={asTone(item.categoryTone)} size="sm">
+          {item.categoryLabel}
         </Badge>
         {/* Only the priorities worth interrupting for get a chip; medium and
             low on every card would be noise. */}

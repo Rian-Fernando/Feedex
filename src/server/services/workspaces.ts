@@ -12,6 +12,7 @@ import {
   type WorkspaceRole,
 } from '@/lib/db/schema';
 import { createId, ID_PREFIX, slugify, uniquifySlug } from '@/lib/ids';
+import { seedWorkspaceLabels } from '@/server/services/labels';
 import { AppError } from '@/lib/errors';
 import type { updateWorkspaceSchema } from '@/lib/validation';
 import { recordActivity } from './activity';
@@ -42,6 +43,10 @@ export async function createWorkspace(
     userId: input.ownerId,
     role: 'owner',
   });
+
+  // Before anything can reference them: feedback rows carry label keys, so a
+  // workspace without its vocabulary would have no valid status to ingest into.
+  await seedWorkspaceLabels(workspace.id, db);
 
   await recordActivity(
     {

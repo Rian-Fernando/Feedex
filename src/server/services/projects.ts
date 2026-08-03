@@ -14,7 +14,7 @@ import {
 import { createId, ID_PREFIX, slugify, uniquifySlug } from '@/lib/ids';
 import { AppError } from '@/lib/errors';
 import { generateApiKey } from '@/lib/auth/api-keys';
-import { OPEN_STATUSES } from '@/lib/taxonomy';
+import { getVocabulary } from '@/server/services/labels';
 import type { CreateProjectInput, UpdateProjectInput, WidgetSettingsInput } from '@/lib/validation';
 import { recordActivity } from './activity';
 
@@ -71,6 +71,11 @@ export async function listProjects(workspaceId: string): Promise<ProjectWithStat
 
   const projectIds = rows.map((row) => row.id);
 
+  // "Open" is whatever this workspace says it is, so the per-project counts
+  // follow a renamed or added status instead of a hard-coded list.
+  const { openStatusKeys } = await getVocabulary(workspaceId);
+  const openKeys = openStatusKeys.length ? openStatusKeys : [''];
+
   // Two grouped queries rather than a per-project count, so the list view stays
   // at a constant number of round trips as projects are added.
   const [totals, opens, publicKeys] = await Promise.all([
@@ -82,9 +87,7 @@ export async function listProjects(workspaceId: string): Promise<ProjectWithStat
     db
       .select({ projectId: feedback.projectId, value: count() })
       .from(feedback)
-      .where(
-        and(inArray(feedback.projectId, projectIds), inArray(feedback.status, [...OPEN_STATUSES])),
-      )
+      .where(and(inArray(feedback.projectId, projectIds), inArray(feedback.status, openKeys)))
       .groupBy(feedback.projectId),
     db
       .select({ projectId: apiKeys.projectId, keyHash: apiKeys.keyHash })
