@@ -32,14 +32,16 @@ import {
   Textarea,
 } from '@/components/ui/field';
 import { Switch } from '@/components/ui/misc';
+import { WidgetPreview } from '@/components/dashboard/widget-preview';
 import { FEEDBACK_CATEGORIES, PROJECT_ENVIRONMENTS, PROJECT_STATUSES } from '@/lib/taxonomy';
+import { MAX_ATTACHMENTS } from '@/lib/attachments';
 import {
   deleteProjectAction,
   updateProjectAction,
   updateWidgetSettingsAction,
 } from '@/server/actions/projects';
 import type { ActionResult } from '@/lib/errors';
-import type { Project } from '@/lib/db/schema';
+import type { FeedbackCategory, Project, WidgetSettings } from '@/lib/db/schema';
 
 const INITIAL: ActionResult = { ok: false };
 
@@ -136,17 +138,54 @@ export function ProjectSettingsForm({ project }: { project: Project }) {
 }
 
 /** Widget appearance and behaviour. */
+/** Fully-populated settings, so the preview never has to reason about absence. */
+function resolveSettings(project: Project): Required<WidgetSettings> {
+  const settings = project.widgetSettings;
+
+  return {
+    position: settings.position ?? 'bottom-right',
+    accentColor: settings.accentColor ?? project.color,
+    buttonLabel: settings.buttonLabel ?? 'Feedback',
+    launcherIcon: settings.launcherIcon ?? 'chat',
+    title: settings.title ?? 'Send feedback',
+    description: settings.description ?? 'Found a bug or have an idea? Let us know.',
+    successMessage: settings.successMessage ?? 'Thanks — your feedback has been received.',
+    requireEmail: settings.requireEmail ?? false,
+    attachmentsEnabled: settings.attachmentsEnabled ?? true,
+    theme: settings.theme ?? 'auto',
+    categories: settings.categories?.length
+      ? settings.categories
+      : ['bug', 'feature', 'ui', 'other'],
+  };
+}
+
 export function WidgetSettingsForm({ project }: { project: Project }) {
   const router = useRouter();
   const action = updateWidgetSettingsAction.bind(null, project.id);
   const [state, formAction, pending] = React.useActionState(action, INITIAL);
 
-  const settings = project.widgetSettings;
-  const enabled = settings.categories ?? ['bug', 'feature', 'ui', 'other'];
+  /*
+    Held in state rather than left uncontrolled, because the preview beside the
+    form has to reflect what is typed before it is saved. Choosing a colour and
+    only finding out how it looks after a save-and-reload is the reason nobody
+    bothers to theme these things.
+  */
+  const [draft, setDraft] = React.useState(() => resolveSettings(project));
+
+  const set = <K extends keyof WidgetSettings>(key: K, value: Required<WidgetSettings>[K]) =>
+    setDraft((current) => ({ ...current, [key]: value }));
+
+  const toggleCategory = (value: FeedbackCategory) =>
+    setDraft((current) => ({
+      ...current,
+      categories: current.categories.includes(value)
+        ? current.categories.filter((entry) => entry !== value)
+        : [...current.categories, value],
+    }));
 
   React.useEffect(() => {
     if (state.ok) {
-      toast.success('Widget updated');
+      toast.success('Widget updated — live on your site on the next page load');
       router.refresh();
     }
   }, [state, router]);
@@ -156,108 +195,207 @@ export function WidgetSettingsForm({ project }: { project: Project }) {
       <form action={formAction}>
         <CardHeader>
           <CardTitle>Widget</CardTitle>
-          <CardDescription>How the feedback widget looks and behaves on your site.</CardDescription>
+          <CardDescription>
+            How the feedback widget looks and behaves on your site. Saved changes reach every embed
+            on its next page load — no snippet edit and no redeploy.
+          </CardDescription>
         </CardHeader>
 
-        <CardContent className="flex flex-col gap-4 pt-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldLabel>Button label</FieldLabel>
-              <Input
-                name="buttonLabel"
-                defaultValue={settings.buttonLabel ?? 'Feedback'}
-                maxLength={32}
-              />
-            </Field>
+        <CardContent className="grid gap-6 pt-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
+          <div className="flex min-w-0 flex-col gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <FieldLabel>Button label</FieldLabel>
+                <Input
+                  name="buttonLabel"
+                  value={draft.buttonLabel}
+                  onChange={(event) => set('buttonLabel', event.target.value)}
+                  maxLength={32}
+                />
+              </Field>
 
-            <Field>
-              <FieldLabel>Accent colour</FieldLabel>
-              <Input
-                name="accentColor"
-                type="color"
-                defaultValue={settings.accentColor ?? project.color}
-                className="h-9.5 cursor-pointer p-1"
-              />
-            </Field>
+              <Field>
+                <FieldLabel>Accent colour</FieldLabel>
+                <div className="flex gap-2">
+                  <Input
+                    name="accentColor"
+                    type="color"
+                    value={draft.accentColor}
+                    onChange={(event) => set('accentColor', event.target.value)}
+                    className="h-9.5 w-14 shrink-0 cursor-pointer p-1"
+                  />
+                  {/*
+                    A text field beside the swatch, because a brand colour is
+                    something people paste as a hex code rather than hunt for
+                    in an eyedropper.
+                  */}
+                  <Input
+                    aria-label="Accent colour hex value"
+                    value={draft.accentColor}
+                    onChange={(event) => set('accentColor', event.target.value)}
+                    maxLength={7}
+                    className="font-mono"
+                  />
+                </div>
+              </Field>
 
-            <Field>
-              <FieldLabel>Position</FieldLabel>
-              <NativeSelect name="position" defaultValue={settings.position ?? 'bottom-right'}>
-                <option value="bottom-right">Bottom right</option>
-                <option value="bottom-left">Bottom left</option>
-              </NativeSelect>
-            </Field>
+              <Field>
+                <FieldLabel>Button icon</FieldLabel>
+                <NativeSelect
+                  name="launcherIcon"
+                  value={draft.launcherIcon}
+                  onChange={(event) =>
+                    set(
+                      'launcherIcon',
+                      event.target.value as Required<WidgetSettings>['launcherIcon'],
+                    )
+                  }
+                >
+                  <option value="chat">Speech bubble</option>
+                  <option value="bug">Bug</option>
+                  <option value="spark">Sparkle</option>
+                  <option value="none">No icon</option>
+                </NativeSelect>
+              </Field>
+
+              <Field>
+                <FieldLabel>Position</FieldLabel>
+                <NativeSelect
+                  name="position"
+                  value={draft.position}
+                  onChange={(event) =>
+                    set('position', event.target.value as Required<WidgetSettings>['position'])
+                  }
+                >
+                  <option value="bottom-right">Bottom right</option>
+                  <option value="bottom-left">Bottom left</option>
+                </NativeSelect>
+              </Field>
+            </div>
 
             <Field>
               <FieldLabel>Theme</FieldLabel>
-              <NativeSelect name="theme" defaultValue={settings.theme ?? 'auto'}>
+              <NativeSelect
+                name="theme"
+                value={draft.theme}
+                onChange={(event) =>
+                  set('theme', event.target.value as Required<WidgetSettings>['theme'])
+                }
+              >
                 <option value="auto">Match the visitor&apos;s system</option>
                 <option value="light">Always light</option>
                 <option value="dark">Always dark</option>
               </NativeSelect>
+              <FieldDescription>
+                Pick light or dark to lock the widget to your site&apos;s own scheme.
+              </FieldDescription>
             </Field>
+
+            <Field>
+              <FieldLabel>Panel title</FieldLabel>
+              <Input
+                name="title"
+                value={draft.title}
+                onChange={(event) => set('title', event.target.value)}
+                maxLength={64}
+              />
+            </Field>
+
+            <Field>
+              <FieldLabel>Panel description</FieldLabel>
+              <Input
+                name="description"
+                value={draft.description}
+                onChange={(event) => set('description', event.target.value)}
+                maxLength={160}
+              />
+            </Field>
+
+            <Field>
+              <FieldLabel>Success message</FieldLabel>
+              <Input
+                name="successMessage"
+                value={draft.successMessage}
+                onChange={(event) => set('successMessage', event.target.value)}
+                maxLength={160}
+              />
+            </Field>
+
+            <fieldset className="flex flex-col gap-2">
+              <legend className="mb-1 text-sm font-medium text-fg">Categories</legend>
+              <p className="mb-1 text-xs text-fg-subtle">
+                Which options the reporter can choose from, in this order. Turn off anything your
+                project does not want to hear about.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {FEEDBACK_CATEGORIES.map((category) => (
+                  <label
+                    key={category.value}
+                    className="flex cursor-pointer items-center gap-2 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-fg-muted transition-colors hover:border-line-strong has-checked:border-accent-500 has-checked:bg-accent-500/10 has-checked:text-accent-500"
+                  >
+                    <input
+                      type="checkbox"
+                      name="categories"
+                      value={category.value}
+                      checked={draft.categories.includes(category.value)}
+                      onChange={() => toggleCategory(category.value)}
+                      className="sr-only"
+                    />
+                    {category.label}
+                  </label>
+                ))}
+              </div>
+              {draft.categories.length === 0 ? (
+                <p className="text-xs text-danger-500">Keep at least one category enabled.</p>
+              ) : null}
+            </fieldset>
+
+            <label className="flex items-center justify-between gap-4 rounded-lg border border-line-subtle p-3">
+              <span className="flex flex-col gap-0.5">
+                <span className="text-sm font-medium text-fg">Allow screenshots and files</span>
+                <span className="text-xs text-fg-subtle">
+                  Reporters can attach up to {MAX_ATTACHMENTS} files. Images are compressed in the
+                  browser before upload.
+                </span>
+              </span>
+              <Switch
+                name="attachmentsEnabled"
+                checked={draft.attachmentsEnabled}
+                onCheckedChange={(value) => set('attachmentsEnabled', value)}
+              />
+            </label>
+
+            <label className="flex items-center justify-between gap-4 rounded-lg border border-line-subtle p-3">
+              <span className="flex flex-col gap-0.5">
+                <span className="text-sm font-medium text-fg">Require an email address</span>
+                <span className="text-xs text-fg-subtle">
+                  Reporters must provide an email before they can submit.
+                </span>
+              </span>
+              <Switch
+                name="requireEmail"
+                checked={draft.requireEmail}
+                onCheckedChange={(value) => set('requireEmail', value)}
+              />
+            </label>
           </div>
 
-          <Field>
-            <FieldLabel>Panel title</FieldLabel>
-            <Input name="title" defaultValue={settings.title ?? 'Send feedback'} maxLength={64} />
-          </Field>
-
-          <Field>
-            <FieldLabel>Panel description</FieldLabel>
-            <Input
-              name="description"
-              defaultValue={settings.description ?? 'Found a bug or have an idea? Let us know.'}
-              maxLength={160}
-            />
-          </Field>
-
-          <Field>
-            <FieldLabel>Success message</FieldLabel>
-            <Input
-              name="successMessage"
-              defaultValue={settings.successMessage ?? 'Thanks — your feedback has been received.'}
-              maxLength={160}
-            />
-          </Field>
-
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-1 text-sm font-medium text-fg">Categories</legend>
-            <p className="mb-1 text-xs text-fg-subtle">
-              Which options the reporter can choose from.
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="label-mono text-fg-subtle">Live preview</p>
+            <WidgetPreview settings={draft} fallbackAccent={project.color} />
+            <p className="text-xs text-fg-subtle">
+              The real widget, running your unsaved settings. Nothing sent from here is recorded.
             </p>
-            <div className="flex flex-wrap gap-2">
-              {FEEDBACK_CATEGORIES.map((category) => (
-                <label
-                  key={category.value}
-                  className="flex cursor-pointer items-center gap-2 rounded-full border border-line px-3 py-1.5 text-xs font-medium text-fg-muted transition-colors hover:border-line-strong has-checked:border-accent-500 has-checked:bg-accent-500/10 has-checked:text-accent-500"
-                >
-                  <input
-                    type="checkbox"
-                    name="categories"
-                    value={category.value}
-                    defaultChecked={enabled.includes(category.value)}
-                    className="sr-only"
-                  />
-                  {category.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          <label className="flex items-center justify-between gap-4 rounded-lg border border-line-subtle p-3">
-            <span className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium text-fg">Require an email address</span>
-              <span className="text-xs text-fg-subtle">
-                Reporters must provide an email before they can submit.
-              </span>
-            </span>
-            <Switch name="requireEmail" defaultChecked={settings.requireEmail ?? false} />
-          </label>
+          </div>
         </CardContent>
 
         <CardFooter className="justify-end">
-          <Button type="submit" loading={pending} size="sm">
+          <Button
+            type="submit"
+            loading={pending}
+            size="sm"
+            disabled={draft.categories.length === 0}
+          >
             Save widget
           </Button>
         </CardFooter>

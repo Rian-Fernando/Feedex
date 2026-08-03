@@ -9,12 +9,14 @@ import {
   ImageOff,
   Mail,
   Monitor,
+  Paperclip,
   Smartphone,
   Tablet,
 } from 'lucide-react';
 
 import { requireWorkspace } from '@/lib/auth';
-import { getFeedback, listNotes } from '@/server/services/feedback';
+import { getFeedback, listAttachments, listNotes } from '@/server/services/feedback';
+import { formatBytes, isInlineImage } from '@/lib/attachments';
 import { PageHeader } from '@/components/dashboard/shell';
 import {
   DeleteFeedbackButton,
@@ -46,7 +48,10 @@ export default async function FeedbackDetailPage({ params }: { params: Promise<{
   const item = await getFeedback(context.workspaceId, id);
   if (!item) notFound();
 
-  const notes = await listNotes(context.workspaceId, id);
+  const [notes, attachments] = await Promise.all([
+    listNotes(context.workspaceId, id),
+    listAttachments(context.workspaceId, id),
+  ]);
 
   const status = statusMeta(item.status);
   const category = categoryMeta(item.category);
@@ -135,23 +140,64 @@ export default async function FeedbackDetailPage({ params }: { params: Promise<{
 
           <Card>
             <CardHeader>
-              <CardTitle>Screenshot</CardTitle>
+              <CardTitle>Attachments</CardTitle>
             </CardHeader>
             <CardContent className="pt-3">
-              {item.screenshotUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- user-supplied external URL
-                <img
-                  src={item.screenshotUrl}
-                  alt={`Screenshot submitted with feedback #${item.reference}`}
-                  className="w-full rounded-lg border border-line-subtle"
-                />
+              {attachments.length > 0 || item.screenshotUrl ? (
+                <ul className="flex flex-col gap-3">
+                  {attachments.map((file) => (
+                    <li key={file.id}>
+                      {isInlineImage(file.mimeType) ? (
+                        <a
+                          href={`/api/attachments/${file.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="group block"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element -- served from our own attachment route, not an optimisable static asset */}
+                          <img
+                            src={`/api/attachments/${file.id}`}
+                            alt={file.name}
+                            className="w-full rounded-lg border border-line-subtle transition-colors group-hover:border-accent-500"
+                          />
+                          <span className="mt-1.5 flex items-center justify-between gap-2 text-xs text-fg-subtle">
+                            <span className="truncate">{file.name}</span>
+                            <span className="shrink-0">{formatBytes(file.size)}</span>
+                          </span>
+                        </a>
+                      ) : (
+                        <a
+                          href={`/api/attachments/${file.id}`}
+                          download={file.name}
+                          className="flex items-center gap-3 rounded-lg border border-line-subtle p-3 transition-colors hover:border-accent-500"
+                        >
+                          <Paperclip aria-hidden className="size-4 shrink-0 text-fg-subtle" />
+                          <span className="min-w-0 flex-1 truncate text-sm text-fg">
+                            {file.name}
+                          </span>
+                          <span className="shrink-0 text-xs text-fg-subtle">
+                            {formatBytes(file.size)}
+                          </span>
+                        </a>
+                      )}
+                    </li>
+                  ))}
+
+                  {item.screenshotUrl ? (
+                    <li>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- user-supplied external URL */}
+                      <img
+                        src={item.screenshotUrl}
+                        alt={`Screenshot submitted with feedback #${item.reference}`}
+                        className="w-full rounded-lg border border-line-subtle"
+                      />
+                    </li>
+                  ) : null}
+                </ul>
               ) : (
                 <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-line-subtle px-6 py-10 text-center text-fg-subtle">
                   <ImageOff aria-hidden className="size-5" />
-                  <p className="text-sm">No screenshot was attached.</p>
-                  <p className="text-xs">
-                    Screenshot capture is planned for a future release of the widget.
-                  </p>
+                  <p className="text-sm">Nothing was attached to this report.</p>
                 </div>
               )}
             </CardContent>

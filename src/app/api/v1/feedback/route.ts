@@ -86,6 +86,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         userAgent: request.headers.get('user-agent')?.slice(0, 512) ?? input.context?.userAgent,
         referrer: origin ?? input.context?.referrer,
       },
+      // Dropped rather than rejected when the project has attachments switched
+      // off: a stale widget on a cached page should not start failing reports
+      // the moment the setting is changed in the dashboard.
+      attachments:
+        context.project.widgetSettings?.attachmentsEnabled === false ? [] : input.attachments,
     });
 
     // Post-response bookkeeping: none of it may fail the submission.

@@ -92,12 +92,17 @@ export const styles = /* css */ `
   bottom: 56px;
   width: 360px;
   max-width: calc(100vw - 40px);
+  /* Never taller than the space above the launcher. On a short window, or once
+     attachments have been added, the panel scrolls rather than growing off the
+     top of the screen where the title and the category chips would be. */
+  max-height: calc(100vh - 96px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--fx-bg);
   color: var(--fx-fg);
   border: 1px solid var(--fx-border);
   border-radius: var(--fx-radius);
   box-shadow: var(--fx-shadow);
-  overflow: hidden;
   opacity: 0;
   transform: translateY(8px) scale(0.98);
   pointer-events: none;
@@ -197,7 +202,15 @@ export const styles = /* css */ `
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.fx-textarea { min-height: 90px; resize: vertical; line-height: 1.55; }
+/* Bounded on both ends. A vertical resize handle with no ceiling could be
+   dragged past the bottom of the panel, and since the panel clipped its
+   overflow the extra height simply vanished behind the edge. */
+.fx-textarea {
+  min-height: 90px;
+  max-height: 200px;
+  resize: vertical;
+  line-height: 1.55;
+}
 
 .fx-input::placeholder, .fx-textarea::placeholder { color: var(--fx-fg-muted); opacity: 0.75; }
 
@@ -224,6 +237,89 @@ export const styles = /* css */ `
 .fx-submit:hover:not(:disabled) { filter: brightness(1.08); }
 .fx-submit:disabled { opacity: 0.6; cursor: not-allowed; }
 .fx-submit:focus-visible { outline: 2px solid var(--fx-accent); outline-offset: 2px; }
+
+/* ------------------------------ attachments ------------------------------ */
+
+.fx-attach {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  padding: 7px 11px;
+  border: 1px dashed var(--fx-border);
+  border-radius: var(--fx-radius-sm);
+  background: transparent;
+  color: var(--fx-fg-muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.fx-attach:hover:not(:disabled) { border-color: var(--fx-accent); color: var(--fx-accent); }
+.fx-attach:focus-visible { outline: 2px solid var(--fx-accent); outline-offset: 2px; }
+.fx-attach:disabled { opacity: 0.55; cursor: not-allowed; }
+.fx-attach svg { width: 14px; height: 14px; }
+
+/* The real input stays in the DOM for its file dialog, but is never shown:
+   native file inputs cannot be styled, and the button above proxies clicks. */
+.fx-file { display: none; }
+
+.fx-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.fx-thumb {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  border: 1px solid var(--fx-border);
+  border-radius: var(--fx-radius-sm);
+  overflow: hidden;
+  background: var(--fx-bg-subtle);
+}
+
+.fx-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Non-image attachments show their extension instead of a preview. */
+.fx-thumb-file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 100%;
+  padding: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fx-fg-muted);
+  text-align: center;
+  word-break: break-all;
+}
+
+.fx-thumb-remove {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 17px;
+  height: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  cursor: pointer;
+}
+
+.fx-thumb-remove svg { width: 7px; height: 7px; }
+.fx-thumb-remove:hover { background: rgba(0, 0, 0, 0.82); }
+.fx-thumb-remove:focus-visible { outline: 2px solid var(--fx-accent); outline-offset: 1px; }
+
+.fx-hint { margin: 0; font-size: 11.5px; color: var(--fx-fg-muted); }
 
 .fx-error {
   margin: 0;

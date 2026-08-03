@@ -45,24 +45,54 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 ---
 
+## Configure from the dashboard
+
+Most projects never need to touch the snippet. Open the project, go to
+**Settings → Widget**, and set the accent colour, theme, button label and icon,
+panel copy, and which categories a reporter may choose from. A live preview
+beside the form runs the real widget against your unsaved settings.
+
+Saved changes reach every page that embeds the widget on its next load. The
+widget fetches its configuration at boot from:
+
+```
+GET /api/v1/widget-config?key=pk_fdx_your_project_key
+```
+
+That response is edge-cached for five minutes, so a settings change is live
+within about that long, and the fetch costs your visitors nothing after the
+first one.
+
+Anything you set in the snippet always wins over the dashboard, so a value
+hard-coded in HTML cannot be moved out from under you. To opt out of remote
+configuration entirely, add `data-feedex-no-remote-config="true"`.
+
+---
+
 ## Configure with attributes
 
 Every option has a `data-feedex-*` attribute, so the common case needs no
 JavaScript.
 
-| Attribute                   | Values                        | Default                                     |
-| --------------------------- | ----------------------------- | ------------------------------------------- |
-| `data-feedex-key`           | Your public key               | **required**                                |
-| `data-feedex-host`          | Feedex origin                 | The script's own origin                     |
-| `data-feedex-position`      | `bottom-right`, `bottom-left` | `bottom-right`                              |
-| `data-feedex-accent`        | Any hex colour                | `#B58BF9`                                   |
-| `data-feedex-label`         | Button text                   | `Feedback`                                  |
-| `data-feedex-title`         | Panel heading                 | `Send feedback`                             |
-| `data-feedex-description`   | Panel subheading              | `Found a bug or have an idea? Let us know.` |
-| `data-feedex-theme`         | `light`, `dark`, `auto`       | `auto`                                      |
-| `data-feedex-require-email` | `true`, `false`               | `false`                                     |
-| `data-feedex-hide-button`   | `true`, `false`               | `false`                                     |
-| `data-feedex-categories`    | Comma-separated               | `bug,feature,ui,other`                      |
+| Attribute                      | Values                         | Default                                     |
+| ------------------------------ | ------------------------------ | ------------------------------------------- |
+| `data-feedex-key`              | Your public key                | **required**                                |
+| `data-feedex-host`             | Feedex origin                  | The script's own origin                     |
+| `data-feedex-position`         | `bottom-right`, `bottom-left`  | `bottom-right`                              |
+| `data-feedex-accent`           | Any hex colour                 | `#B58BF9`                                   |
+| `data-feedex-label`            | Button text                    | `Feedback`                                  |
+| `data-feedex-title`            | Panel heading                  | `Send feedback`                             |
+| `data-feedex-description`      | Panel subheading               | `Found a bug or have an idea? Let us know.` |
+| `data-feedex-icon`             | `chat`, `bug`, `spark`, `none` | `chat`                                      |
+| `data-feedex-theme`            | `light`, `dark`, `auto`        | `auto`                                      |
+| `data-feedex-require-email`    | `true`, `false`                | `false`                                     |
+| `data-feedex-attachments`      | `true`, `false`                | `true`                                      |
+| `data-feedex-hide-button`      | `true`, `false`                | `false`                                     |
+| `data-feedex-categories`       | Comma-separated                | `bug,feature,ui,other`                      |
+| `data-feedex-no-remote-config` | `true`, `false`                | `false`                                     |
+
+Omit an attribute and the project's dashboard setting applies. Set one and it
+wins — an absent attribute means "not specified", not "off".
 
 Example:
 
@@ -140,6 +170,33 @@ Feedex.setMetadata({
 
 Metadata appears on the feedback detail page under **Custom metadata**. Keys are
 capped at 64 characters and values at 512.
+
+---
+
+## Screenshots and files
+
+Reporters can attach up to **3 files** per report — the thing that turns "the
+layout looks wrong" into something you can act on without a reply thread.
+
+Accepted: PNG, JPEG, WebP, GIF, plain text, `.log`, JSON, and PDF. Each file is
+capped at **512 KB**, and one report at **1 MB** in total.
+
+Screenshots routinely exceed that, so images are resized to a longest edge of
+1600px and re-encoded in the browser until they fit. Only the result is
+uploaded — a 4 MB retina grab becomes a couple of hundred kilobytes and still
+shows the problem. Files that are already small keep their original bytes, so a
+crisp PNG stays a crisp PNG. Animated GIFs are never re-encoded, because
+flattening one to a single frame would throw away the reason it was attached.
+
+SVG is deliberately not accepted: an SVG can carry script, and these files are
+served back from the dashboard where your team opens them.
+
+Attachments are stored in Postgres alongside the report, so a self-hosted
+install needs no object storage, no bucket policy, and no signing keys. They are
+readable only by signed-in members of the workspace that owns the report.
+
+Switch the whole feature off per project under **Settings → Widget**, or per
+embed with `data-feedex-attachments="false"`.
 
 ---
 

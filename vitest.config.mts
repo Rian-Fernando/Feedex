@@ -21,6 +21,10 @@ export default defineConfig({
       // encoding in place, which breaks resolution for any checkout whose path
       // contains a space or a non-ASCII character.
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // Service modules are marked `server-only`, which throws outside a
+      // React Server Components graph. The integration tests call those
+      // services directly, so the marker is stubbed out here.
+      'server-only': fileURLToPath(new URL('./tests/stubs/server-only.ts', import.meta.url)),
     },
   },
 });

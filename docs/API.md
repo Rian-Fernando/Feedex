@@ -98,6 +98,69 @@ rate limited per IP and per project.
 | `email`       | string | no       | Valid email, or empty                                                                      |
 | `name`        | string | no       | ≤120 chars                                                                                 |
 | `context`     | object | no       | All fields optional; unknown keys are dropped                                              |
+| `attachments` | array  | no       | Up to 3 files. See below                                                                   |
+
+Each entry in `attachments` is:
+
+| Field  | Type   | Notes                                                                                                     |
+| ------ | ------ | --------------------------------------------------------------------------------------------------------- |
+| `name` | string | ≤255 chars                                                                                                |
+| `type` | string | `image/png`, `image/jpeg`, `image/webp`, `image/gif`, `text/plain`, `application/json`, `application/pdf` |
+| `data` | string | Base64, **without** a `data:` prefix. ≤512 KB decoded                                                     |
+
+One report may carry at most 3 files totalling 1 MB decoded. A file of any
+other type, or over the cap, fails the whole request with `validation_error`.
+If the project has attachments turned off, files are dropped and the report is
+still accepted — a cached page running an older configuration should not start
+failing.
+
+---
+
+## `GET /api/v1/widget-config`
+
+Returns a project's widget appearance settings. Authenticated by a **public**
+key in the query string. This is what lets the dashboard restyle every embed
+without a snippet edit.
+
+```
+GET /api/v1/widget-config?key=pk_fdx_...
+```
+
+Everything returned is public by construction — it is read with a publishable
+key and ends up in the widget's DOM on the host page regardless. No domain,
+secret key, feedback content, or workspace identity is exposed.
+
+Cached at the edge for five minutes (`stale-while-revalidate` for a day), so
+this is not a database round trip per visitor.
+
+### Response — 200
+
+```json
+{
+  "data": {
+    "project": { "name": "Portfolio" },
+    "widget": {
+      "position": "bottom-right",
+      "accentColor": "#B58BF9",
+      "buttonLabel": "Feedback",
+      "launcherIcon": "chat",
+      "title": "Send feedback",
+      "description": "Found a bug or have an idea? Let us know.",
+      "successMessage": "Thanks — your feedback has been received.",
+      "requireEmail": false,
+      "categories": ["bug", "ui", "feature", "other"],
+      "theme": "auto",
+      "attachments": {
+        "enabled": true,
+        "maxCount": 3,
+        "maxBytes": 524288,
+        "maxTotalBytes": 1048576,
+        "accept": "image/png,image/jpeg,image/webp,image/gif,.txt,.log,.json,.pdf"
+      }
+    }
+  }
+}
+```
 
 ### Response — 201
 

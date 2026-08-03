@@ -11,19 +11,11 @@ import {
   LogOut,
   MessageSquare,
   Settings,
-  User,
 } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { Logo } from '@/components/brand/logo';
-import {
-  Menu,
-  MenuContent,
-  MenuItem,
-  MenuLabel,
-  MenuSeparator,
-  MenuTrigger,
-} from '@/components/ui/menu';
+import { Menu, MenuContent, MenuItem, MenuLabel, MenuTrigger } from '@/components/ui/menu';
 import { logoutAction } from '@/server/actions/auth';
 import { switchWorkspaceAction } from '@/server/actions/settings';
 import type { WorkspaceRole } from '@/lib/db/schema';
@@ -168,14 +160,12 @@ export function SidebarNav({
             </span>
           </MenuTrigger>
 
+          {/*
+            Sign out only. Settings is a primary destination in the nav above,
+            and offering a second door to the same page made the account menu
+            look like it led somewhere else.
+          */}
           <MenuContent align="start" side="top" className="w-56">
-            <MenuItem asChild>
-              <Link href="/dashboard/settings" onClick={onNavigate}>
-                <User aria-hidden className="size-3.5" />
-                Account settings
-              </Link>
-            </MenuItem>
-            <MenuSeparator />
             <MenuItem destructive onSelect={() => void logoutAction()}>
               <LogOut aria-hidden className="size-3.5" />
               Sign out

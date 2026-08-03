@@ -1,6 +1,13 @@
 import { collectContext } from './context';
 import { styles } from './styles';
-import type { FeedexApi, FeedexCategory, FeedexConfig } from './types';
+import {
+  DEFAULT_LIMITS,
+  isImage,
+  prepareAttachment,
+  type AttachmentLimits,
+  type PreparedAttachment,
+} from './attachments';
+import type { FeedexApi, FeedexCategory, FeedexConfig, FeedexLauncherIcon } from './types';
 
 /**
  * Feedex embeddable feedback widget.
@@ -36,21 +43,33 @@ const DEFAULTS = {
   position: 'bottom-right',
   accentColor: '#B58BF9',
   buttonLabel: 'Feedback',
+  launcherIcon: 'chat',
   title: 'Send feedback',
   description: 'Found a bug or have an idea? Let us know.',
   successMessage: 'Thanks — your feedback has been received.',
   requireEmail: false,
   theme: 'auto',
+  attachments: true,
   categories: ['bug', 'feature', 'ui', 'other'],
 } satisfies Partial<FeedexConfig>;
 
 const ICONS = {
   chat: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M17 9.5a6.5 6.5 0 0 1-9.4 5.8L3 16.5l1.3-4.4A6.5 6.5 0 1 1 17 9.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>',
+  bug: '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7 5.5a3 3 0 0 1 6 0M5 9H2m16 0h-3M5 13.5H2.6M17.4 13.5H15M6.6 4.2 5.2 2.8m8.2 1.4 1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><rect x="5" y="5.5" width="10" height="11" rx="5" stroke="currentColor" stroke-width="1.5"/></svg>',
+  spark:
+    '<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 2.2l1.9 4.7 4.9 1.9-4.9 1.9L10 15.4 8.1 10.7 3.2 8.8l4.9-1.9L10 2.2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>',
   close:
     '<svg viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   check:
     '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  paperclip:
+    '<svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M13.4 7.3 8.1 12.6a3.3 3.3 0 0 1-4.7-4.7l5.3-5.3a2.2 2.2 0 0 1 3.1 3.1l-5.3 5.3a1.1 1.1 0 1 1-1.6-1.6l4.9-4.8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
 };
+
+function launcherGlyph(icon: FeedexLauncherIcon): string {
+  if (icon === 'none') return '';
+  return ICONS[icon] ?? ICONS.chat;
+}
 
 /**
  * Parses a 3- or 6-digit hex colour into RGB components.
@@ -89,9 +108,13 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+type ResolvedConfig = Required<
+  Omit<FeedexConfig, 'user' | 'metadata' | 'hideButton' | 'host' | 'disableRemoteConfig'>
+> &
+  Pick<FeedexConfig, 'user' | 'metadata' | 'hideButton' | 'host' | 'disableRemoteConfig'>;
+
 class FeedexWidget {
-  private config: Required<Omit<FeedexConfig, 'user' | 'metadata' | 'hideButton' | 'host'>> &
-    Pick<FeedexConfig, 'user' | 'metadata' | 'hideButton' | 'host'>;
+  private config: ResolvedConfig;
 
   private host: HTMLDivElement | null = null;
   private shadow: ShadowRoot | null = null;
@@ -103,23 +126,141 @@ class FeedexWidget {
   private lastFocused: Element | null = null;
   private schemeQuery: MediaQueryList | null = null;
 
+  private limits: AttachmentLimits = DEFAULT_LIMITS;
+  private attachments: PreparedAttachment[] = [];
+
+  /**
+   * Set by `destroy()`, and checked after the config await in `start()`.
+   *
+   * Without it, tearing the widget down during boot — which the host app does
+   * on every theme switch — would let the in-flight instance mount itself
+   * afterwards, leaving an orphaned second widget on the page.
+   */
+  private destroyed = false;
+
+  /**
+   * Fields the embedding page set explicitly.
+   *
+   * Remembered so that dashboard-managed settings can be merged underneath
+   * them: whoever wrote the snippet gets the last word, and everything they
+   * left alone follows the project's configuration.
+   */
+  private readonly explicit: Set<keyof FeedexConfig>;
+
   constructor(config: FeedexConfig) {
+    this.explicit = new Set(
+      (Object.keys(config) as Array<keyof FeedexConfig>).filter(
+        (name) => config[name] !== undefined,
+      ),
+    );
+
     this.config = {
       key: config.key,
       host: config.host,
       position: config.position ?? DEFAULTS.position,
       accentColor: config.accentColor ?? DEFAULTS.accentColor,
       buttonLabel: config.buttonLabel ?? DEFAULTS.buttonLabel,
+      launcherIcon: config.launcherIcon ?? DEFAULTS.launcherIcon,
       title: config.title ?? DEFAULTS.title,
       description: config.description ?? DEFAULTS.description,
       successMessage: config.successMessage ?? DEFAULTS.successMessage,
       requireEmail: config.requireEmail ?? DEFAULTS.requireEmail,
       theme: config.theme ?? DEFAULTS.theme,
+      attachments: config.attachments ?? DEFAULTS.attachments,
       categories: config.categories?.length ? config.categories : [...DEFAULTS.categories],
       user: config.user,
       metadata: config.metadata,
       hideButton: config.hideButton,
+      disableRemoteConfig: config.disableRemoteConfig,
     };
+  }
+
+  /**
+   * Pulls the project's dashboard-managed appearance settings.
+   *
+   * Deliberately best-effort. If the request fails, times out, or the instance
+   * is older than this endpoint, the widget carries on with what the snippet
+   * gave it — a feedback button that renders in the wrong colour is a far
+   * better outcome than one that never renders.
+   */
+  private async loadRemoteConfig(): Promise<void> {
+    if (this.config.disableRemoteConfig) return;
+
+    let timer: number | undefined;
+
+    try {
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      if (controller) {
+        timer = window.setTimeout(() => controller.abort(), 3000);
+      }
+
+      const response = await fetch(
+        `${this.endpoint()}/api/v1/widget-config?key=${encodeURIComponent(this.config.key)}`,
+        { credentials: 'omit', signal: controller?.signal },
+      );
+
+      if (!response.ok) return;
+
+      const body = (await response.json()) as {
+        data?: { widget?: Record<string, unknown> };
+      };
+
+      const remote = body.data?.widget;
+      if (remote) this.applyRemoteConfig(remote);
+    } catch {
+      // Offline, blocked by an extension, aborted, or an older instance.
+    } finally {
+      if (timer !== undefined) window.clearTimeout(timer);
+    }
+  }
+
+  private applyRemoteConfig(remote: Record<string, unknown>): void {
+    const take = <K extends keyof FeedexConfig>(name: K, value: unknown): void => {
+      // An explicit value in the snippet always wins, and a null or absent
+      // remote field means "not configured" rather than "clear it".
+      if (this.explicit.has(name) || value === undefined || value === null) return;
+      (this.config as Record<string, unknown>)[name as string] = value;
+    };
+
+    take('position', remote.position);
+    take('accentColor', remote.accentColor);
+    take('buttonLabel', remote.buttonLabel);
+    take('launcherIcon', remote.launcherIcon);
+    take('title', remote.title);
+    take('description', remote.description);
+    take('successMessage', remote.successMessage);
+    take('requireEmail', remote.requireEmail);
+    take('theme', remote.theme);
+
+    if (Array.isArray(remote.categories) && remote.categories.length > 0) {
+      take('categories', remote.categories);
+    }
+
+    const attachments = remote.attachments as Partial<AttachmentLimits> & { enabled?: boolean };
+    if (attachments && typeof attachments === 'object') {
+      take('attachments', attachments.enabled);
+      this.limits = {
+        maxCount: attachments.maxCount ?? DEFAULT_LIMITS.maxCount,
+        maxBytes: attachments.maxBytes ?? DEFAULT_LIMITS.maxBytes,
+        maxTotalBytes: attachments.maxTotalBytes ?? DEFAULT_LIMITS.maxTotalBytes,
+        accept: attachments.accept ?? DEFAULT_LIMITS.accept,
+      };
+    }
+  }
+
+  /**
+   * Fetches configuration, then renders.
+   *
+   * The order matters: rendering first would show the default purple pill and
+   * then repaint it in the project's colour a moment later, which reads as a
+   * broken third-party script on someone else's site. Waiting costs a few
+   * hundred milliseconds before a floating button appears, which nobody
+   * notices, and the request is edge-cached.
+   */
+  async start(): Promise<void> {
+    if (this.host) return;
+    await this.loadRemoteConfig();
+    if (!this.destroyed) this.mount();
   }
 
   mount(): void {
@@ -173,7 +314,16 @@ class FeedexWidget {
   }
 
   private template(): string {
-    const { buttonLabel, title, description, categories, requireEmail, hideButton } = this.config;
+    const {
+      buttonLabel,
+      launcherIcon,
+      title,
+      description,
+      categories,
+      requireEmail,
+      hideButton,
+      attachments,
+    } = this.config;
 
     const chips = categories
       .map(
@@ -185,12 +335,22 @@ class FeedexWidget {
       )
       .join('');
 
+    const attachField = attachments
+      ? `<div class="fx-field">
+           <input type="file" class="fx-file" id="fx-file" accept="${escapeHtml(this.limits.accept)}" multiple>
+           <button type="button" class="fx-attach">
+             ${ICONS.paperclip}<span>Add screenshot or file</span>
+           </button>
+           <ul class="fx-thumbs"></ul>
+         </div>`
+      : '';
+
     return `
       ${
         hideButton
           ? ''
           : `<button type="button" class="fx-launcher" aria-haspopup="dialog" aria-expanded="false" aria-controls="fx-panel">
-               ${ICONS.chat}<span>${escapeHtml(buttonLabel)}</span>
+               ${launcherGlyph(launcherIcon)}<span>${escapeHtml(buttonLabel)}</span>
              </button>`
       }
       <div class="fx-panel" id="fx-panel" role="dialog" aria-modal="false" aria-labelledby="fx-title" data-open="false">
@@ -213,6 +373,7 @@ class FeedexWidget {
                 placeholder="Tell us what happened, or what you'd like to see." required
                 maxlength="5000"></textarea>
             </div>
+            ${attachField}
             <div class="fx-field">
               <label class="fx-label" for="fx-email">Email${requireEmail ? '' : ' (optional)'}</label>
               <input class="fx-input" id="fx-email" name="email" type="email"
@@ -238,6 +399,17 @@ class FeedexWidget {
     this.launcher?.addEventListener('click', () => this.toggle());
     this.shadow?.querySelector('.fx-close')?.addEventListener('click', () => this.setOpen(false));
     this.form?.addEventListener('submit', (event) => void this.submit(event));
+
+    const fileInput = this.shadow?.querySelector<HTMLInputElement>('.fx-file');
+    const attachButton = this.shadow?.querySelector<HTMLButtonElement>('.fx-attach');
+
+    attachButton?.addEventListener('click', () => fileInput?.click());
+    fileInput?.addEventListener('change', () => {
+      const files = Array.from(fileInput.files ?? []);
+      // Cleared so picking the same file twice in a row still fires `change`.
+      fileInput.value = '';
+      void this.addFiles(files);
+    });
 
     // Escape closes, and pointer-down outside dismisses. Both are registered on
     // the document because the shadow root does not receive events that never
@@ -310,6 +482,102 @@ class FeedexWidget {
     }
   }
 
+  /* ------------------------------ attachments ----------------------------- */
+
+  private async addFiles(files: File[]): Promise<void> {
+    if (files.length === 0) return;
+
+    this.showError('');
+    const button = this.shadow?.querySelector<HTMLButtonElement>('.fx-attach');
+    const label = button?.querySelector('span');
+
+    // Compressing a large screenshot takes a beat, and a button that looks
+    // inert during it invites a second click and a duplicate attachment.
+    if (button) button.disabled = true;
+    if (label) label.textContent = 'Processing…';
+
+    try {
+      for (const file of files) {
+        if (this.attachments.length >= this.limits.maxCount) {
+          this.showError(`Up to ${this.limits.maxCount} files can be attached.`);
+          break;
+        }
+
+        try {
+          const prepared = await prepareAttachment(file, this.limits);
+          const total = this.attachments.reduce((sum, item) => sum + item.size, 0) + prepared.size;
+
+          if (total > this.limits.maxTotalBytes) {
+            if (prepared.preview) URL.revokeObjectURL(prepared.preview);
+            this.showError(
+              `Attachments must total under ${Math.round(this.limits.maxTotalBytes / 1024)} KB.`,
+            );
+            break;
+          }
+
+          this.attachments.push(prepared);
+        } catch (error) {
+          this.showError(error instanceof Error ? error.message : 'That file could not be added.');
+        }
+      }
+    } finally {
+      if (button) button.disabled = false;
+      if (label) label.textContent = 'Add screenshot or file';
+      this.renderThumbs();
+    }
+  }
+
+  private removeAttachment(index: number): void {
+    const [removed] = this.attachments.splice(index, 1);
+    // The object URL is a live reference to the file; without revoking it the
+    // bytes stay held for the lifetime of the host page.
+    if (removed?.preview) URL.revokeObjectURL(removed.preview);
+    this.renderThumbs();
+    this.showError('');
+  }
+
+  private clearAttachments(): void {
+    for (const item of this.attachments) {
+      if (item.preview) URL.revokeObjectURL(item.preview);
+    }
+    this.attachments = [];
+    this.renderThumbs();
+  }
+
+  private renderThumbs(): void {
+    const list = this.shadow?.querySelector<HTMLUListElement>('.fx-thumbs');
+    if (!list) return;
+
+    list.textContent = '';
+
+    this.attachments.forEach((item, index) => {
+      const li = document.createElement('li');
+      li.className = 'fx-thumb';
+
+      if (item.preview && isImage(item.type)) {
+        const img = document.createElement('img');
+        img.src = item.preview;
+        img.alt = item.name;
+        li.appendChild(img);
+      } else {
+        const span = document.createElement('span');
+        span.className = 'fx-thumb-file';
+        span.textContent = (item.name.split('.').pop() ?? 'file').slice(0, 5);
+        li.appendChild(span);
+      }
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'fx-thumb-remove';
+      remove.setAttribute('aria-label', `Remove ${item.name}`);
+      remove.innerHTML = ICONS.close;
+      remove.addEventListener('click', () => this.removeAttachment(index));
+      li.appendChild(remove);
+
+      list.appendChild(li);
+    });
+  }
+
   private announce(message: string): void {
     const region = this.shadow?.querySelector('[role="status"]');
     if (region) region.textContent = message;
@@ -360,6 +628,13 @@ class FeedexWidget {
           email: email || undefined,
           name: this.config.user?.name || undefined,
           context: collectContext(this.config.metadata),
+          attachments: this.attachments.length
+            ? this.attachments.map((item) => ({
+                name: item.name,
+                type: item.type,
+                data: item.data,
+              }))
+            : undefined,
         }),
       });
 
@@ -399,6 +674,7 @@ class FeedexWidget {
 
     this.announce(this.config.successMessage);
     this.form?.reset();
+    this.clearAttachments();
 
     // Close, then restore the form so the next open starts clean.
     window.setTimeout(() => {
@@ -426,13 +702,22 @@ class FeedexWidget {
   }
 
   destroy(): void {
+    this.destroyed = true;
     document.removeEventListener('keydown', this.onKeyDown, true);
     document.removeEventListener('pointerdown', this.onPointerDown, true);
     this.schemeQuery = null;
+
+    for (const item of this.attachments) {
+      if (item.preview) URL.revokeObjectURL(item.preview);
+    }
+    this.attachments = [];
+
     this.host?.remove();
     this.host = null;
     this.shadow = null;
     this.panel = null;
+    this.form = null;
+    this.launcher = null;
   }
 }
 
@@ -481,17 +766,30 @@ function configFromScriptTag(): FeedexConfig | null {
     .map((value) => value.trim())
     .filter(Boolean) as FeedexCategory[] | undefined;
 
+  /*
+    Absent attributes stay `undefined` rather than becoming `false`, because
+    the constructor records which keys were set explicitly and merges the
+    project's dashboard settings under everything that was not. Collapsing an
+    absent attribute to a value would pin the setting and make the dashboard
+    control appear to do nothing.
+  */
+  const flag = (value: string | undefined): boolean | undefined =>
+    value === undefined ? undefined : value === 'true';
+
   return {
     key,
     host: data.feedexHost,
     position: data.feedexPosition as FeedexConfig['position'],
     accentColor: data.feedexAccent,
     buttonLabel: data.feedexLabel,
+    launcherIcon: data.feedexIcon as FeedexConfig['launcherIcon'],
     title: data.feedexTitle,
     description: data.feedexDescription,
     theme: data.feedexTheme as FeedexConfig['theme'],
-    requireEmail: data.feedexRequireEmail === 'true',
-    hideButton: data.feedexHideButton === 'true',
+    requireEmail: flag(data.feedexRequireEmail),
+    hideButton: flag(data.feedexHideButton),
+    attachments: flag(data.feedexAttachments),
+    disableRemoteConfig: flag(data.feedexNoRemoteConfig),
     categories: categories?.length ? categories : undefined,
   };
 }
@@ -505,13 +803,14 @@ const api: FeedexApi = {
       return;
     }
     instance?.destroy();
-    instance = new FeedexWidget(config);
+    const widget = new FeedexWidget(config);
+    instance = widget;
 
     // `document.body` may not exist yet if the script is not deferred.
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => instance?.mount(), { once: true });
+      document.addEventListener('DOMContentLoaded', () => void widget.start(), { once: true });
     } else {
-      instance.mount();
+      void widget.start();
     }
   },
   open(category) {

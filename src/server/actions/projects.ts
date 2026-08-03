@@ -122,7 +122,9 @@ export async function updateWidgetSettingsAction(
         formValue(formData, 'description') || 'Found a bug or have an idea? Let us know.',
       successMessage:
         formValue(formData, 'successMessage') || 'Thanks — your feedback has been received.',
+      launcherIcon: formValue(formData, 'launcherIcon') || 'chat',
       requireEmail: formData.get('requireEmail') === 'on',
+      attachmentsEnabled: formData.get('attachmentsEnabled') === 'on',
       theme: formValue(formData, 'theme') || 'auto',
       categories: categories.length > 0 ? categories : undefined,
     });

@@ -3,6 +3,8 @@
 export type FeedexCategory =
   'bug' | 'feature' | 'ui' | 'performance' | 'content' | 'question' | 'other';
 
+export type FeedexLauncherIcon = 'chat' | 'bug' | 'spark' | 'none';
+
 export interface FeedexConfig {
   /** Project public key, `pk_fdx_…`. Required. */
   key: string;
@@ -11,12 +13,22 @@ export interface FeedexConfig {
   position?: 'bottom-right' | 'bottom-left';
   accentColor?: string;
   buttonLabel?: string;
+  launcherIcon?: FeedexLauncherIcon;
   title?: string;
   description?: string;
   successMessage?: string;
   requireEmail?: boolean;
   theme?: 'light' | 'dark' | 'auto';
   categories?: FeedexCategory[];
+  /** Lets reporters attach screenshots or files. Defaults to on. */
+  attachments?: boolean;
+  /**
+   * Skips the fetch of dashboard-managed appearance settings.
+   *
+   * Set this when the embedding code wants to be the sole authority on how the
+   * widget looks, so a change in the dashboard can never move it.
+   */
+  disableRemoteConfig?: boolean;
   /** Hides the floating button; the widget is then opened via `Feedex.open()`. */
   hideButton?: boolean;
   /** Pre-fills the reporter fields when the host app already knows the user. */

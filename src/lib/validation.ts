@@ -7,6 +7,13 @@ import {
   projectEnvironment,
   projectStatus,
 } from '@/lib/db/schema';
+import {
+  MAX_ATTACHMENTS,
+  MAX_ATTACHMENTS_TOTAL_BYTES,
+  MAX_ATTACHMENT_BYTES,
+  base64ByteLength,
+  isAllowedAttachmentType,
+} from '@/lib/attachments';
 
 /**
  * Validation contracts shared by server actions, the public API, and the
@@ -115,7 +122,9 @@ export const widgetSettingsSchema = z.object({
   title: sanitizedText(64).default('Send feedback'),
   description: sanitizedText(160).default('Found a bug or have an idea? Let us know.'),
   successMessage: sanitizedText(160).default('Thanks — your feedback has been received.'),
+  launcherIcon: z.enum(['chat', 'bug', 'spark', 'none']).default('chat'),
   requireEmail: z.boolean().default(false),
+  attachmentsEnabled: z.boolean().default(true),
   theme: z.enum(['light', 'dark', 'auto']).default('auto'),
   categories: z
     .array(z.enum(feedbackCategory.enumValues))
@@ -172,6 +181,29 @@ export const feedbackContextSchema = z
   .strip();
 
 /** Payload accepted by `POST /api/v1/feedback` from the widget. */
+/**
+ * One uploaded screenshot or file.
+ *
+ * The declared `type` is checked against the allowlist rather than trusted, and
+ * the size is derived from the base64 itself rather than from any client-stated
+ * length — a payload that lies about its size would otherwise get to allocate
+ * whatever it wanted.
+ */
+export const attachmentSchema = z.object({
+  name: sanitizedText(255).default('attachment'),
+  type: z.string().max(128).refine(isAllowedAttachmentType, 'That file type is not accepted.'),
+  /** Base64 without a data-URL prefix. */
+  data: z
+    .string()
+    .min(1)
+    .max(Math.ceil((MAX_ATTACHMENT_BYTES * 4) / 3) + 8, 'That file is too large.')
+    .regex(/^[A-Za-z0-9+/]+={0,2}$/, 'Malformed attachment payload.')
+    .refine(
+      (value) => base64ByteLength(value) <= MAX_ATTACHMENT_BYTES,
+      `Each file must be under ${Math.round(MAX_ATTACHMENT_BYTES / 1024)} KB.`,
+    ),
+});
+
 export const submitFeedbackSchema = z.object({
   publicKey: z.string().min(8).max(128),
   category: z.enum(feedbackCategory.enumValues).default('other'),
@@ -180,6 +212,17 @@ export const submitFeedbackSchema = z.object({
   email: emailSchema.optional().or(z.literal('')),
   name: sanitizedText(120).optional(),
   context: feedbackContextSchema.optional(),
+  attachments: z
+    .array(attachmentSchema)
+    .max(MAX_ATTACHMENTS)
+    .optional()
+    .refine(
+      (files) =>
+        !files ||
+        files.reduce((total, file) => total + base64ByteLength(file.data), 0) <=
+          MAX_ATTACHMENTS_TOTAL_BYTES,
+      `Attachments must total under ${Math.round(MAX_ATTACHMENTS_TOTAL_BYTES / 1024)} KB.`,
+    ),
 });
 
 export const updateFeedbackSchema = z.object({

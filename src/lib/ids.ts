@@ -15,6 +15,7 @@ export const ID_PREFIX = {
   workspace: 'wsp',
   project: 'prj',
   feedback: 'fbk',
+  attachment: 'att',
   note: 'nte',
   apiKey: 'key',
   activity: 'act',

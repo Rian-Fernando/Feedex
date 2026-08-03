@@ -5,6 +5,7 @@ import { and, asc, count, desc, eq, gte, ilike, inArray, lt, or, sql } from 'dri
 import { getDb } from '@/lib/db';
 import {
   feedback,
+  feedbackAttachments,
   feedbackNotes,
   projects,
   users,
@@ -16,6 +17,7 @@ import {
 } from '@/lib/db/schema';
 import { createId, ID_PREFIX } from '@/lib/ids';
 import { AppError } from '@/lib/errors';
+import { base64ByteLength } from '@/lib/attachments';
 import { CLOSED_STATUSES, OPEN_STATUSES, PRIORITY_WEIGHT } from '@/lib/taxonomy';
 import type { FeedbackFilterInput, UpdateFeedbackInput } from '@/lib/validation';
 
@@ -167,6 +169,14 @@ export async function getFeedback(
 
 /* ------------------------------- Ingestion -------------------------------- */
 
+export interface IngestAttachment {
+  name: string;
+  /** Already validated against the allowlist by the caller. */
+  type: string;
+  /** Base64, no data-URL prefix. */
+  data: string;
+}
+
 export interface IngestInput {
   workspaceId: string;
   projectId: string;
@@ -177,6 +187,7 @@ export interface IngestInput {
   reporterName?: string | null;
   context: FeedbackContext;
   priority?: FeedbackPriority;
+  attachments?: IngestAttachment[];
 }
 
 /**
@@ -217,6 +228,23 @@ export async function ingestFeedback(input: IngestInput): Promise<Feedback> {
 
       const created = rows[0];
       if (!created) throw new Error('Insert returned no row.');
+
+      if (input.attachments?.length) {
+        await db.insert(feedbackAttachments).values(
+          input.attachments.map((file) => ({
+            id: createId(ID_PREFIX.attachment),
+            feedbackId: created.id,
+            // Carried from the report rather than re-derived, so an attachment
+            // can never end up on a different tenant than its parent.
+            workspaceId: created.workspaceId,
+            name: file.name,
+            mimeType: file.type,
+            size: base64ByteLength(file.data),
+            data: file.data,
+          })),
+        );
+      }
+
       return created;
     } catch (error) {
       lastError = error;
@@ -305,6 +333,80 @@ export async function deleteFeedback(workspaceId: string, feedbackId: string): P
   await db
     .delete(feedback)
     .where(and(eq(feedback.workspaceId, workspaceId), eq(feedback.id, feedbackId)));
+}
+
+/* ------------------------------- Attachments ------------------------------ */
+
+/** Attachment metadata, without the payload. */
+export interface AttachmentView {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  createdAt: Date;
+}
+
+export async function listAttachments(
+  workspaceId: string,
+  feedbackId: string,
+): Promise<AttachmentView[]> {
+  const db = await getDb();
+
+  return db
+    .select({
+      id: feedbackAttachments.id,
+      name: feedbackAttachments.name,
+      mimeType: feedbackAttachments.mimeType,
+      size: feedbackAttachments.size,
+      createdAt: feedbackAttachments.createdAt,
+    })
+    .from(feedbackAttachments)
+    .where(
+      and(
+        eq(feedbackAttachments.workspaceId, workspaceId),
+        eq(feedbackAttachments.feedbackId, feedbackId),
+      ),
+    )
+    .orderBy(asc(feedbackAttachments.createdAt));
+}
+
+export interface AttachmentPayload extends AttachmentView {
+  data: string;
+}
+
+/**
+ * One attachment, payload included.
+ *
+ * Workspace-scoped in the query itself rather than fetched and then checked, so
+ * a member of another workspace holding a valid attachment id gets the same
+ * empty result as someone holding a made-up one — the row is invisible, not
+ * merely forbidden.
+ */
+export async function getAttachment(
+  workspaceId: string,
+  attachmentId: string,
+): Promise<AttachmentPayload | null> {
+  const db = await getDb();
+
+  const rows = await db
+    .select({
+      id: feedbackAttachments.id,
+      name: feedbackAttachments.name,
+      mimeType: feedbackAttachments.mimeType,
+      size: feedbackAttachments.size,
+      createdAt: feedbackAttachments.createdAt,
+      data: feedbackAttachments.data,
+    })
+    .from(feedbackAttachments)
+    .where(
+      and(
+        eq(feedbackAttachments.workspaceId, workspaceId),
+        eq(feedbackAttachments.id, attachmentId),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
 }
 
 /* ---------------------------------- Notes --------------------------------- */

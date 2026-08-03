@@ -34,7 +34,6 @@ const COLUMNS = [
         href: `${siteConfig.links.github}/blob/main/docs/SELF_HOSTING.md`,
         external: true,
       },
-      { label: 'llms.txt', href: '/llms.txt' },
     ],
   },
   {

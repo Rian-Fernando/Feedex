@@ -314,6 +314,45 @@ export const feedbackNotes = pgTable(
   (table) => [index('feedback_notes_feedback_id_idx').on(table.feedbackId, table.createdAt)],
 );
 
+/**
+ * Screenshots and files attached to a report.
+ *
+ * Bytes live in the database as base64 rather than in object storage. That is a
+ * deliberate trade: it keeps a self-hosted install to a single dependency —
+ * Postgres — with no bucket to provision, no signing keys, and no second thing
+ * that can be misconfigured into being world-readable. It only works because
+ * uploads are hard-capped and images are downscaled in the browser before they
+ * are ever sent; see `src/lib/attachments.ts` for the limits.
+ *
+ * `workspace_id` is denormalised for the same reason it is on `feedback`: every
+ * read is workspace-scoped, and carrying the tenant on the row means an
+ * isolation check can never be forgotten in a join.
+ */
+export const feedbackAttachments = pgTable(
+  'feedback_attachments',
+  {
+    id: text('id').primaryKey(),
+    feedbackId: text('feedback_id')
+      .notNull()
+      .references(() => feedback.id, { onDelete: 'cascade' }),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 255 }).notNull(),
+    /** Validated against an allowlist on write; never taken from the client. */
+    mimeType: varchar('mime_type', { length: 128 }).notNull(),
+    /** Decoded size in bytes, used for display and for quota accounting. */
+    size: integer('size').notNull(),
+    /** Base64 payload, without a data-URL prefix. */
+    data: text('data').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('feedback_attachments_feedback_id_idx').on(table.feedbackId),
+    index('feedback_attachments_workspace_id_idx').on(table.workspaceId),
+  ],
+);
+
 /* -------------------------------------------------------------------------- */
 /*                                  Activity                                  */
 /* -------------------------------------------------------------------------- */
@@ -424,16 +463,32 @@ export interface WorkspaceSettings {
   defaultCategories?: (typeof feedbackCategory.enumValues)[number][];
 }
 
+/**
+ * Per-project widget appearance and behaviour.
+ *
+ * Served to the widget at boot by `/api/v1/widget-config`, so changing any of
+ * this in the dashboard takes effect on the next page load of the host site —
+ * no redeploy and no snippet edit. Every field is optional; the widget carries
+ * its own defaults and merges these over them.
+ */
 export interface WidgetSettings {
   position?: 'bottom-right' | 'bottom-left';
   accentColor?: string;
   buttonLabel?: string;
+  /** Glyph on the floating button, or `none` for a label-only pill. */
+  launcherIcon?: 'chat' | 'bug' | 'spark' | 'none';
   title?: string;
   description?: string;
   successMessage?: string;
   requireEmail?: boolean;
+  /**
+   * Which categories the reporter may pick from, in display order. A project
+   * that only wants UI and feature reports lists exactly those two.
+   */
   categories?: (typeof feedbackCategory.enumValues)[number][];
   theme?: 'light' | 'dark' | 'auto';
+  /** Whether the reporter may attach screenshots or files. */
+  attachmentsEnabled?: boolean;
 }
 
 /**
