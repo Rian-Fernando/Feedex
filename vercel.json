@@ -8,8 +8,9 @@
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         {
+          "//": "Five minutes at the edge, not an hour, and a ten-minute stale window rather than a day. This file's behaviour changes, not just its styling: when remote configuration shipped, sites still holding the previous bundle had no way to ask for their settings at all, so a colour changed in the dashboard appeared to do nothing until the cache aged out. Propagation now costs minutes. It is a 10 kB static file behind a CDN, so the extra revalidations are not worth optimising against.",
           "key": "Cache-Control",
-          "value": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+          "value": "public, max-age=300, s-maxage=300, stale-while-revalidate=600"
         }
       ]
     },

@@ -32,6 +32,7 @@ import {
   Textarea,
 } from '@/components/ui/field';
 import { Switch } from '@/components/ui/misc';
+import { ColorPicker } from '@/components/ui/color-picker';
 import { WidgetPreview } from '@/components/dashboard/widget-preview';
 import { FEEDBACK_CATEGORIES, PROJECT_ENVIRONMENTS, PROJECT_STATUSES } from '@/lib/taxonomy';
 import { MAX_ATTACHMENTS } from '@/lib/attachments';
@@ -50,6 +51,7 @@ export function ProjectSettingsForm({ project }: { project: Project }) {
   const router = useRouter();
   const action = updateProjectAction.bind(null, project.id);
   const [state, formAction, pending] = React.useActionState(action, INITIAL);
+  const [color, setColor] = React.useState(project.color);
 
   React.useEffect(() => {
     if (state.ok) {
@@ -92,7 +94,7 @@ export function ProjectSettingsForm({ project }: { project: Project }) {
             />
           </Field>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field error={state.fieldErrors?.environment}>
               <FieldLabel>Environment</FieldLabel>
               <NativeSelect name="environment" defaultValue={project.environment}>
@@ -114,17 +116,16 @@ export function ProjectSettingsForm({ project }: { project: Project }) {
                 ))}
               </NativeSelect>
             </Field>
-
-            <Field error={state.fieldErrors?.color}>
-              <FieldLabel>Colour</FieldLabel>
-              <Input
-                name="color"
-                type="color"
-                defaultValue={project.color}
-                className="h-9.5 cursor-pointer p-1"
-              />
-            </Field>
           </div>
+
+          <Field error={state.fieldErrors?.color}>
+            <FieldLabel>Project colour</FieldLabel>
+            <ColorPicker name="color" value={color} onChange={setColor} label="Project colour" />
+            <FieldDescription>
+              Identifies this project across the dashboard. The widget uses its own accent, set
+              under Widget below.
+            </FieldDescription>
+          </Field>
         </CardContent>
 
         <CardFooter className="justify-end">
@@ -195,9 +196,22 @@ export function WidgetSettingsForm({ project }: { project: Project }) {
       <form action={formAction}>
         <CardHeader>
           <CardTitle>Widget</CardTitle>
+          {/*
+            Names the project and its domain rather than saying "your site".
+            Widget settings are per project, and every project's settings page
+            looks identical — so it is genuinely easy to restyle one project
+            while looking at another and conclude the feature is broken.
+          */}
           <CardDescription>
-            How the feedback widget looks and behaves on your site. Saved changes reach every embed
-            on its next page load — no snippet edit and no redeploy.
+            How the widget looks on <strong className="font-medium text-fg">{project.name}</strong>
+            {project.domain ? (
+              <>
+                {' '}
+                (<span className="font-mono text-xs">{project.domain}</span>)
+              </>
+            ) : null}
+            . These settings apply to this project only, and reach every embed on its next page load
+            — no snippet edit and no redeploy.
           </CardDescription>
         </CardHeader>
 
@@ -212,31 +226,6 @@ export function WidgetSettingsForm({ project }: { project: Project }) {
                   onChange={(event) => set('buttonLabel', event.target.value)}
                   maxLength={32}
                 />
-              </Field>
-
-              <Field>
-                <FieldLabel>Accent colour</FieldLabel>
-                <div className="flex gap-2">
-                  <Input
-                    name="accentColor"
-                    type="color"
-                    value={draft.accentColor}
-                    onChange={(event) => set('accentColor', event.target.value)}
-                    className="h-9.5 w-14 shrink-0 cursor-pointer p-1"
-                  />
-                  {/*
-                    A text field beside the swatch, because a brand colour is
-                    something people paste as a hex code rather than hunt for
-                    in an eyedropper.
-                  */}
-                  <Input
-                    aria-label="Accent colour hex value"
-                    value={draft.accentColor}
-                    onChange={(event) => set('accentColor', event.target.value)}
-                    maxLength={7}
-                    className="font-mono"
-                  />
-                </div>
               </Field>
 
               <Field>
@@ -272,6 +261,16 @@ export function WidgetSettingsForm({ project }: { project: Project }) {
                 </NativeSelect>
               </Field>
             </div>
+
+            <Field>
+              <FieldLabel>Accent colour</FieldLabel>
+              <ColorPicker
+                name="accentColor"
+                value={draft.accentColor}
+                onChange={(value) => set('accentColor', value)}
+                label="Widget accent colour"
+              />
+            </Field>
 
             <Field>
               <FieldLabel>Theme</FieldLabel>

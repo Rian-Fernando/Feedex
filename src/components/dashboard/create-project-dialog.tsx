@@ -25,19 +25,13 @@ import {
   Textarea,
 } from '@/components/ui/field';
 import { CopyButton } from '@/components/ui/misc';
+import { ColorPicker, COLOR_SWATCHES } from '@/components/ui/color-picker';
 import { PROJECT_ENVIRONMENTS } from '@/lib/taxonomy';
 import { createProjectAction } from '@/server/actions/projects';
 import type { ActionResult } from '@/lib/errors';
 import type { CreatedProject } from '@/server/actions/projects';
 
 const INITIAL: ActionResult<CreatedProject> = { ok: false };
-
-/**
- * Per-project accent swatches. Violet and gold lead because they are the brand
- * colours; the rest are distinct enough that several projects stay tellable
- * apart at the size of a 10px dot in a list.
- */
-const SWATCHES = ['#B58BF9', '#F7B83D', '#5EC8A0', '#E8833A', '#6BA8E5', '#E2637E', '#A78BFA'];
 
 /**
  * Project creation.
@@ -51,7 +45,7 @@ const SWATCHES = ['#B58BF9', '#F7B83D', '#5EC8A0', '#E8833A', '#6BA8E5', '#E2637
 export function CreateProjectDialog({ defaultOpen = false }: { defaultOpen?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(defaultOpen);
-  const [color, setColor] = React.useState(SWATCHES[0]!);
+  const [color, setColor] = React.useState<string>(COLOR_SWATCHES[0]);
   const [state, formAction, pending] = React.useActionState(createProjectAction, INITIAL);
   const created = state.ok ? state.data : undefined;
 
@@ -228,27 +222,7 @@ function CreateForm({
 
           <fieldset className="flex flex-col gap-2">
             <legend className="text-sm font-medium text-fg">Colour</legend>
-            <input type="hidden" name="color" value={color} />
-            <div className="flex flex-wrap gap-2">
-              {SWATCHES.map((swatch) => (
-                <button
-                  key={swatch}
-                  type="button"
-                  onClick={() => setColor(swatch)}
-                  aria-label={`Use colour ${swatch}`}
-                  aria-pressed={color === swatch}
-                  className="size-7 rounded-full transition-transform hover:scale-110 data-[active=true]:ring-2 data-[active=true]:ring-offset-2"
-                  data-active={color === swatch}
-                  style={
-                    {
-                      backgroundColor: swatch,
-                      '--tw-ring-color': swatch,
-                      '--tw-ring-offset-color': 'var(--surface-overlay)',
-                    } as React.CSSProperties
-                  }
-                />
-              ))}
-            </div>
+            <ColorPicker name="color" value={color} onChange={setColor} label="Project colour" />
           </fieldset>
         </DialogBody>
 
