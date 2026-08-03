@@ -15,7 +15,7 @@
   },
   "scripts": {
     "dev": "npm run widget:build && next dev",
-    "build": "npm run widget:build && next build",
+    "build": "npm run widget:build && npm run db:migrate && next build",
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
