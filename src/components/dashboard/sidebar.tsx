@@ -55,42 +55,51 @@ export function SidebarNav({
   openCount,
   projectCount,
   onNavigate,
-}: SidebarProps & { onNavigate?: () => void }) {
+  collapsed = false,
+}: SidebarProps & { onNavigate?: () => void; collapsed?: boolean }) {
   const pathname = usePathname();
   const active = workspaces.find((w) => w.id === activeWorkspaceId);
   const counts = { openCount, projectCount };
 
   return (
     <div className="flex h-full flex-col gap-1">
-      <div className="px-3 py-4">
+      <div className={cn('py-4', collapsed ? 'px-2' : 'px-3')}>
         <Link
           href="/"
-          className="mb-4 inline-flex px-2"
+          className={cn('mb-4 inline-flex', collapsed ? 'justify-center px-0' : 'px-2')}
           aria-label="Feedex home"
           onClick={onNavigate}
         >
-          <Logo className="text-[26px]" />
+          {/* The wordmark does not fit a 60px rail; the mark alone does. */}
+          <Logo className="text-[26px]" showWordmark={!collapsed} />
         </Link>
 
         <Menu>
           <MenuTrigger
+            aria-label={collapsed ? `Workspace: ${active?.name ?? 'Workspace'}` : undefined}
+            title={collapsed ? (active?.name ?? 'Workspace') : undefined}
             className={cn(
-              'flex w-full items-center gap-2 rounded-lg border border-line bg-surface-raised px-2.5 py-2 hover:border-line-strong',
+              'flex w-full items-center rounded-lg border border-line bg-surface-raised py-2 hover:border-line-strong',
               'text-left transition-colors',
+              collapsed ? 'justify-center px-0' : 'gap-2 px-2.5',
             )}
           >
             <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-accent-600 text-[0.6875rem] font-semibold text-white">
               {active?.name.slice(0, 1).toUpperCase() ?? 'W'}
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-fg">
-                {active?.name ?? 'Workspace'}
-              </span>
-              <span className="block truncate text-xs text-fg-subtle capitalize">
-                {active?.role ?? 'member'}
-              </span>
-            </span>
-            <ChevronsUpDown aria-hidden className="size-3.5 shrink-0 text-fg-subtle" />
+            {!collapsed ? (
+              <>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-fg">
+                    {active?.name ?? 'Workspace'}
+                  </span>
+                  <span className="block truncate text-xs text-fg-subtle capitalize">
+                    {active?.role ?? 'member'}
+                  </span>
+                </span>
+                <ChevronsUpDown aria-hidden className="size-3.5 shrink-0 text-fg-subtle" />
+              </>
+            ) : null}
           </MenuTrigger>
 
           <MenuContent align="start" className="w-56">
@@ -111,7 +120,7 @@ export function SidebarNav({
         </Menu>
       </div>
 
-      <nav aria-label="Main" className="flex-1 px-3">
+      <nav aria-label="Main" className={cn('flex-1', collapsed ? 'px-2' : 'px-3')}>
         <ul className="flex flex-col gap-0.5">
           {NAV_ITEMS.map((item) => {
             const isActive =
@@ -127,20 +136,38 @@ export function SidebarNav({
                   href={item.href}
                   onClick={onNavigate}
                   aria-current={isActive ? 'page' : undefined}
+                  // Collapsed, the icon is the only visible content, so the
+                  // label has to survive as the accessible name.
+                  aria-label={collapsed ? item.label : undefined}
+                  title={collapsed ? item.label : undefined}
                   className={cn(
-                    'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors',
+                    'relative flex items-center rounded-lg py-2 text-sm font-medium transition-colors',
+                    collapsed ? 'justify-center px-0' : 'gap-2.5 px-2.5',
                     isActive
                       ? 'bg-surface-inset text-fg'
                       : 'text-fg-muted hover:bg-surface-inset/60 hover:text-fg',
                   )}
                 >
                   <item.icon aria-hidden className="size-4 shrink-0" />
-                  <span className="flex-1">{item.label}</span>
-                  {count ? (
-                    <span className="rounded-full bg-surface-sunken px-1.5 py-0.5 text-2xs font-medium text-fg-subtle tabular-nums">
-                      {count}
-                    </span>
-                  ) : null}
+                  {collapsed ? (
+                    // A dot rather than a number: the count does not fit, but
+                    // "there is something here" still needs to carry.
+                    count ? (
+                      <span
+                        aria-hidden
+                        className="absolute top-1 right-1 size-1.5 rounded-full bg-accent-500"
+                      />
+                    ) : null
+                  ) : (
+                    <>
+                      <span className="flex-1">{item.label}</span>
+                      {count ? (
+                        <span className="rounded-full bg-surface-sunken px-1.5 py-0.5 text-2xs font-medium text-fg-subtle tabular-nums">
+                          {count}
+                        </span>
+                      ) : null}
+                    </>
+                  )}
                 </Link>
               </li>
             );
@@ -148,16 +175,25 @@ export function SidebarNav({
         </ul>
       </nav>
 
-      <div className="border-t border-line-subtle p-3">
+      <div className={cn('border-t border-line-subtle', collapsed ? 'p-2' : 'p-3')}>
         <Menu>
-          <MenuTrigger className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-surface-inset">
+          <MenuTrigger
+            aria-label={collapsed ? `Account: ${user.name}` : undefined}
+            title={collapsed ? user.name : undefined}
+            className={cn(
+              'flex w-full items-center rounded-lg py-2 text-left transition-colors hover:bg-surface-inset',
+              collapsed ? 'justify-center px-0' : 'gap-2.5 px-2.5',
+            )}
+          >
             <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-surface-sunken text-xs font-semibold text-fg-muted">
               {user.name.slice(0, 1).toUpperCase()}
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-fg">{user.name}</span>
-              <span className="block truncate text-xs text-fg-subtle">{user.email}</span>
-            </span>
+            {!collapsed ? (
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-fg">{user.name}</span>
+                <span className="block truncate text-xs text-fg-subtle">{user.email}</span>
+              </span>
+            ) : null}
           </MenuTrigger>
 
           {/*

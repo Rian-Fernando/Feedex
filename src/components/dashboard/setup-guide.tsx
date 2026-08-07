@@ -19,9 +19,9 @@ import type { OnboardingStatus } from '@/server/services/projects';
  * The middle step is the one that matters. Pasting a snippet and then having no
  * idea whether it worked is the point where an integration silently stalls, so
  * this waits for the widget to actually reach the server and says so when it
- * does. That status is derived from a real ingestion request carrying the
- * project's public key — it cannot be true unless the snippet is genuinely live
- * on a page someone loaded.
+ * does. That status comes from the widget fetching its configuration at boot —
+ * it cannot be true unless the snippet is genuinely live on a page someone
+ * loaded, and it does not require anyone to have submitted anything yet.
  */
 
 export interface SetupGuideProps {
@@ -136,7 +136,7 @@ export function SetupGuide({ status, host }: SetupGuideProps) {
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full bg-warning-500/12 px-2 py-0.5 text-2xs font-medium text-warning-600 dark:text-warning-400">
                   <Loader2 aria-hidden className="size-3 animate-spin" />
-                  Waiting for the first request
+                  Waiting for the widget
                 </span>
               )
             ) : null

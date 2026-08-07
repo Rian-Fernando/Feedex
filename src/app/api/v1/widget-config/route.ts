@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 
 import { AppError } from '@/lib/errors';
-import { apiError, INGEST_CORS_HEADERS, withCors } from '@/lib/api/response';
-import { authenticateApiKey } from '@/server/services/api-auth';
+import { apiError, clientIp, INGEST_CORS_HEADERS, withCors } from '@/lib/api/response';
+import { RATE_LIMITS, consume } from '@/lib/rate-limit';
+import { authenticateApiKey, touchApiKey } from '@/server/services/api-auth';
 import {
   ATTACHMENT_ACCEPT,
   MAX_ATTACHMENTS,
@@ -41,8 +42,35 @@ export async function GET(request: Request): Promise<NextResponse> {
     const key = new URL(request.url).searchParams.get('key');
     if (!key) throw AppError.validation('A project key is required.');
 
+    // Only requests that missed the edge cache get here, so this bounds the
+    // cache-busting case rather than normal traffic.
+    const limit = await consume({
+      key: `widget-config:${clientIp(request)}`,
+      ...RATE_LIMITS.widgetConfig,
+    });
+
+    if (!limit.allowed) {
+      throw AppError.rateLimited('Too many requests.');
+    }
+
     const context = await authenticateApiKey(key, 'public');
     const settings = context.project.widgetSettings ?? {};
+
+    /*
+      Marks the project as connected.
+
+      This request is only ever made by a widget booting on a real page, which
+      is exactly what "the widget is installed" means — and it is a far better
+      signal than the one the install step used to rely on. Previously the key
+      was touched only when somebody *submitted* feedback, so a correctly
+      installed widget sat on "Waiting for the first request" indefinitely
+      until a visitor happened to file something. That conflated two separate
+      steps: installing the widget, and receiving a first report.
+
+      Fire-and-forget, and after the response is composed, so bookkeeping can
+      never delay or fail a config fetch on someone else's page load.
+    */
+    void touchApiKey(context.keyId).catch(() => undefined);
 
     const response = withCors(
       NextResponse.json({

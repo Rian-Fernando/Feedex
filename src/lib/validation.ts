@@ -54,14 +54,41 @@ export const passwordSchema = z
  * Hostname without scheme or path, e.g. `app.example.com`. Used to scope widget
  * ingestion to the origins a project actually runs on.
  */
+/**
+ * A bare hostname, accepting whatever people actually paste.
+ *
+ * The stored value has to be a hostname — it is compared against the `Origin`
+ * header, which carries no path and no trailing slash. But nobody copies a
+ * hostname; they copy `https://example.com/` out of the address bar, and
+ * rejecting that taught them nothing except that the field was fussy.
+ *
+ * So the scheme, any `www.`, the port, the path, and the query are stripped
+ * first and the result is validated. Note that dropping `www.` is safe rather
+ * than lossy: origin checking already accepts subdomains of the stored host.
+ */
 export const domainSchema = z
   .string()
   .trim()
   .toLowerCase()
-  .max(255)
-  .regex(
-    /^(?:localhost|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,})$/,
-    'Enter a bare hostname, such as example.com.',
+  .max(2048)
+  .transform(
+    (value) =>
+      value
+        .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
+        .replace(/^www\./, '')
+        .split('/')[0]!
+        .split('?')[0]!
+        .split('#')[0]!
+        .split(':')[0]!,
+  )
+  .pipe(
+    z
+      .string()
+      .max(255)
+      .regex(
+        /^(?:localhost|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,})$/,
+        'Enter a domain such as example.com.',
+      ),
   );
 
 export const hexColorSchema = z

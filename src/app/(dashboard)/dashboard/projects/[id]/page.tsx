@@ -147,7 +147,7 @@ export default async function ProjectDetailPage({
                 <CardDescription>
                   {connection.connected
                     ? `Connected — last request ${timeAgo(connection.lastSeen!)}.`
-                    : 'Not connected yet. Paste the snippet and load the page; this flips on its own.'}
+                    : 'Not connected yet. Paste the snippet and open the page — this flips on its own within a minute.'}
                 </CardDescription>
               </div>
               <Badge tone={connection.connected ? 'success' : 'warning'} dot>

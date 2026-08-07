@@ -2,12 +2,13 @@
 
 import * as React from 'react';
 import { Dialog as RadixDialog } from 'radix-ui';
-import { Menu as MenuIcon, X } from 'lucide-react';
+import { Menu as MenuIcon, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { SidebarNav, type SidebarProps } from './sidebar';
 import { ThemeToggle } from './theme-toggle';
 import { SearchCommand } from './search-command';
+import { useBooleanPreference } from '@/lib/local-preference';
 
 /**
  * Dashboard chrome.
@@ -19,18 +20,32 @@ import { SearchCommand } from './search-command';
 export function DashboardShell({ children, ...nav }: SidebarProps & { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
+  /*
+    Collapsing the rail is not decoration: the board wants every pixel it can
+    get, and 15rem of navigation is a whole column. The preference persists, so
+    someone who works on the board keeps the width without re-collapsing it on
+    every visit.
+  */
+  const [collapsed, setCollapsed] = useBooleanPreference('feedex-sidebar-collapsed');
+
   return (
     <div className="min-h-dvh">
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-30 hidden w-60 border-r border-line-subtle bg-surface-raised',
-          'lg:block',
+          'fixed inset-y-0 left-0 z-30 hidden border-r border-line-subtle bg-surface-raised',
+          'transition-[width] duration-200 lg:block',
+          collapsed ? 'w-[3.75rem]' : 'w-60',
         )}
       >
-        <SidebarNav {...nav} />
+        <SidebarNav {...nav} collapsed={collapsed} />
       </aside>
 
-      <div className="lg:pl-60">
+      <div
+        className={cn(
+          'transition-[padding] duration-200',
+          collapsed ? 'lg:pl-[3.75rem]' : 'lg:pl-60',
+        )}
+      >
         <header
           className={cn(
             'sticky top-0 z-20 border-b border-line-subtle bg-surface/85 backdrop-blur-md',
@@ -65,6 +80,22 @@ export function DashboardShell({ children, ...nav }: SidebarProps & { children: 
             </RadixDialog.Portal>
           </RadixDialog.Root>
 
+          {/* Desktop only: below lg the rail is a drawer, which has no collapsed state. */}
+          <button
+            type="button"
+            onClick={() => setCollapsed(!collapsed)}
+            aria-pressed={collapsed}
+            aria-label={collapsed ? 'Expand the navigation' : 'Collapse the navigation'}
+            title={collapsed ? 'Expand the navigation' : 'Collapse the navigation'}
+            className="-ml-1.5 hidden size-9 items-center justify-center rounded-lg text-fg-muted transition-colors hover:bg-surface-inset hover:text-fg lg:inline-flex"
+          >
+            {collapsed ? (
+              <PanelLeftOpen aria-hidden className="size-4.5" />
+            ) : (
+              <PanelLeftClose aria-hidden className="size-4.5" />
+            )}
+          </button>
+
           <SearchCommand />
 
           <div className="ml-auto flex items-center gap-1">
@@ -72,8 +103,13 @@ export function DashboardShell({ children, ...nav }: SidebarProps & { children: 
           </div>
         </header>
 
+        {/*
+          The width cap lifts with the rail. Someone who collapsed the
+          navigation did it to get room, and holding the content at 80rem
+          would have handed that room straight back as empty margin.
+        */}
         <main id="main" className="px-4 py-6 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-7xl">{children}</div>
+          <div className={cn('mx-auto', collapsed ? 'max-w-none' : 'max-w-7xl')}>{children}</div>
         </main>
       </div>
     </div>

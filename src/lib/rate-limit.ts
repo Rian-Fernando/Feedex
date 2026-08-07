@@ -84,4 +84,30 @@ export const RATE_LIMITS = {
   apiPerKey: { limit: 120, windowSeconds: 60 },
   /** Sign-in attempts, per IP address. */
   login: { limit: 10, windowSeconds: 300 },
+  /**
+   * Sign-ups, per IP address.
+   *
+   * Cheaper to abuse than it looks: each one creates a user, a workspace, a
+   * membership, and twelve label rows. Left open it is a resource-exhaustion
+   * vector that costs an attacker one HTTP request.
+   */
+  register: { limit: 5, windowSeconds: 3600 },
+  /** Invitations created, per workspace. Bounds a compromised admin session. */
+  invite: { limit: 30, windowSeconds: 3600 },
+  /**
+   * Invitation acceptances, per IP address.
+   *
+   * Tokens are 32 random bytes, so guessing one is not realistic — this exists
+   * so that trying is visibly futile rather than merely improbable, and so a
+   * script hammering the endpoint stops being free.
+   */
+  inviteAccept: { limit: 20, windowSeconds: 3600 },
+  /**
+   * Widget configuration reads, per IP address.
+   *
+   * Almost every real request is absorbed by the edge cache. This bounds the
+   * ones that are not — a cache-busting query string still reaches the origin,
+   * and this endpoint now writes `last_used_at`.
+   */
+  widgetConfig: { limit: 120, windowSeconds: 60 },
 } as const;

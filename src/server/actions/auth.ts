@@ -39,6 +39,14 @@ export async function registerAction(_prev: unknown, formData: FormData): Promis
       throw AppError.forbidden('Registration is disabled on this instance.');
     }
 
+    // Checked before the password hash: scrypt at these parameters is
+    // deliberately expensive, so doing it first would make the rate limiter
+    // itself the denial-of-service.
+    const limit = await consume({ key: await clientKey('register'), ...RATE_LIMITS.register });
+    if (!limit.allowed) {
+      throw AppError.rateLimited('Too many sign-ups from here. Try again later.');
+    }
+
     const parsed = registerSchema.safeParse({
       name: formValue(formData, 'name'),
       email: formValue(formData, 'email'),

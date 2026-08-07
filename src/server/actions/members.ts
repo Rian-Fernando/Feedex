@@ -2,7 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 
+import { headers } from 'next/headers';
+
 import { assertCan, requireWorkspaceOrThrow } from '@/lib/auth';
+import { RATE_LIMITS, consume } from '@/lib/rate-limit';
 import { AppError, actionFailure, actionSuccess, type ActionResult } from '@/lib/errors';
 import { emailSchema } from '@/lib/validation';
 import { absoluteUrl } from '@/config/site';
@@ -24,6 +27,16 @@ import type { WorkspaceRole } from '@/lib/db/schema';
 
 const ASSIGNABLE_ROLES: WorkspaceRole[] = ['owner', 'admin', 'member', 'viewer'];
 
+/** Best-effort client IP, for the limits that are per person rather than per tenant. */
+async function clientKey(prefix: string): Promise<string> {
+  const headerList = await headers();
+  const ip =
+    headerList.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    headerList.get('x-real-ip') ??
+    'unknown';
+  return `${prefix}:${ip}`;
+}
+
 function parseRole(value: string): WorkspaceRole {
   if (!ASSIGNABLE_ROLES.includes(value as WorkspaceRole)) {
     throw AppError.validation('That is not a valid role.');
@@ -38,6 +51,17 @@ export async function inviteMemberAction(
   try {
     const context = await requireWorkspaceOrThrow();
     assertCan(context.role, 'member.manage');
+
+    // Per workspace, not per IP: this bounds what a compromised admin session
+    // can mint, which is the case that matters here.
+    const limit = await consume({
+      key: `invite:${context.workspaceId}`,
+      ...RATE_LIMITS.invite,
+    });
+
+    if (!limit.allowed) {
+      throw AppError.rateLimited('Too many invitations created. Try again later.');
+    }
 
     const rawEmail = String(formData.get('email') ?? '').trim();
     const role = parseRole(String(formData.get('role') ?? 'member'));
@@ -150,6 +174,16 @@ export async function acceptInvitationAction(token: string): Promise<ActionResul
     const { acceptInvitation } = await import('@/server/services/workspaces');
 
     const user = await requireUserOrThrow();
+
+    const limit = await consume({
+      key: await clientKey('invite-accept'),
+      ...RATE_LIMITS.inviteAccept,
+    });
+
+    if (!limit.allowed) {
+      throw AppError.rateLimited('Too many attempts. Try again later.');
+    }
+
     const { workspaceId } = await acceptInvitation(token, { id: user.id, email: user.email });
 
     // Land them in the workspace they just joined rather than whichever one

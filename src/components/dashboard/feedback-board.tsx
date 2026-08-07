@@ -3,6 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/cn';
@@ -11,6 +12,7 @@ import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/menu';
 import { asTone, priorityMeta } from '@/lib/taxonomy';
 import { timeAgo } from '@/lib/format';
 import { updateFeedbackAction } from '@/server/actions/feedback';
+import { useStringSetPreference } from '@/lib/local-preference';
 import type { FeedbackWithProject } from '@/server/services/feedback';
 import type { FeedbackStatus } from '@/lib/db/schema';
 
@@ -33,6 +35,16 @@ import type { FeedbackStatus } from '@/lib/db/schema';
  * Moves are optimistic: the card jumps immediately and is put back if the
  * server refuses, because a board that waits for a round trip before the card
  * lands feels broken.
+ *
+ * Columns share the available width rather than each taking a fixed 17.5rem
+ * and pushing the rest off-screen. With five or six statuses that meant
+ * scrolling sideways to see whether anything was in the last one, which is the
+ * question a board exists to answer at a glance. Below a floor they do scroll,
+ * because past a certain narrowness a card is unreadable and scrolling is the
+ * honest outcome.
+ *
+ * Columns can also be hidden. Nobody triaging today cares about "Closed", and
+ * hiding it gives its width to the columns they are actually working in.
  */
 
 export interface FeedbackBoardProps {
@@ -46,6 +58,11 @@ export interface FeedbackBoardProps {
 /** Cards rendered per column before the rest are summarised. */
 const COLUMN_LIMIT = 50;
 
+/** Narrowest a column may get before the row starts scrolling instead. */
+const MIN_COLUMN = '13rem';
+
+const HIDDEN_KEY = 'feedex-board-hidden';
+
 export function FeedbackBoard({ items, statuses, canUpdate }: FeedbackBoardProps) {
   const router = useRouter();
 
@@ -53,11 +70,18 @@ export function FeedbackBoard({ items, statuses, canUpdate }: FeedbackBoardProps
   const [over, setOver] = React.useState<FeedbackStatus | null>(null);
 
   /*
+    Which columns are hidden, remembered per browser. A triage view is a
+    personal working preference, not workspace configuration — two people
+    looking at the same board will want different columns out of the way.
+  */
+  const [hidden, toggleHidden] = useStringSetPreference(HIDDEN_KEY);
+
+  /*
     The server list is the source of truth, with in-flight moves layered over
-    it. `useOptimistic` is the right primitive rather than a state copy kept in
-    sync by an effect: it discards the overlay on its own when the transition
-    ends, so a rejected move snaps back without any bookkeeping, and fresh
-    server data always wins.
+    it. `useOptimistic` is the right primitive rather than a state copy
+    resynchronised by an effect: it drops the overlay by itself when the
+    transition ends, so a rejected move snaps back with no bookkeeping and
+    fresh server data always wins.
   */
   const [optimistic, applyMove] = React.useOptimistic(
     items,
@@ -69,8 +93,8 @@ export function FeedbackBoard({ items, statuses, canUpdate }: FeedbackBoardProps
     (item: FeedbackWithProject, status: FeedbackStatus) => {
       if (!canUpdate || item.status === status) return;
 
-      // The optimistic update has to happen inside the transition that owns the
-      // await, or React has no scope in which to hold and then release it.
+      // The optimistic update has to happen inside the transition that owns
+      // the await, or React has no scope in which to hold and then release it.
       React.startTransition(async () => {
         applyMove({ id: item.id, status });
 
@@ -94,84 +118,133 @@ export function FeedbackBoard({ items, statuses, canUpdate }: FeedbackBoardProps
     items: optimistic.filter((item) => item.status === status.key),
   }));
 
+  const visibleColumns = columns.filter((column) => !hidden.includes(column.key));
+  const hiddenColumns = columns.filter((column) => hidden.includes(column.key));
+
   return (
-    <div className="-mx-1 flex snap-x scrollbar-thin gap-3 overflow-x-auto px-1 pb-2">
-      {columns.map((column) => {
-        const visible = column.items.slice(0, COLUMN_LIMIT);
-        const overflow = column.items.length - visible.length;
+    <div className="flex flex-col gap-2">
+      {hiddenColumns.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-2xs text-fg-subtle">Hidden:</span>
+          {hiddenColumns.map((column) => (
+            <button
+              key={column.key}
+              type="button"
+              onClick={() => toggleHidden(column.key)}
+              className="rounded-full border border-line px-2 py-0.5 text-2xs font-medium text-fg-subtle transition-colors hover:border-line-strong hover:text-fg"
+            >
+              {column.label} ({column.items.length}) +
+            </button>
+          ))}
+        </div>
+      ) : null}
 
-        return (
-          <section
-            key={column.key}
-            aria-label={`${column.label}, ${column.items.length} items`}
-            onDragOver={(event) => {
-              if (!canUpdate || !dragging) return;
-              // Without this the drop never fires: the default handling of
-              // dragover is to reject the drop.
-              event.preventDefault();
-              setOver(column.key);
-            }}
-            onDragLeave={() => setOver((current) => (current === column.key ? null : current))}
-            onDrop={(event) => {
-              event.preventDefault();
-              setOver(null);
-              const id = event.dataTransfer.getData('text/plain');
-              const item = optimistic.find((entry) => entry.id === id);
-              if (item) move(item, column.key);
-            }}
-            className={cn(
-              'flex w-[17.5rem] shrink-0 snap-start flex-col rounded-xl border transition-colors',
-              over === column.key
-                ? 'border-accent-500 bg-accent-500/5'
-                : 'border-line-subtle bg-surface-sunken/40',
-            )}
-          >
-            <header className="flex items-center justify-between gap-2 px-3 py-2.5">
-              <div className="flex items-center gap-2">
-                <Badge tone={asTone(column.tone)} dot size="sm">
-                  {column.label}
-                </Badge>
+      {/*
+        `grid` with an explicit column count, not `flex`. Flex children would
+        size to their content and leave the row ragged; here every column gets
+        an equal share of whatever width is available, down to a floor.
+      */}
+      <div
+        className="-mx-1 grid scrollbar-thin gap-3 overflow-x-auto px-1 pb-2"
+        style={{
+          gridTemplateColumns: `repeat(${Math.max(visibleColumns.length, 1)}, minmax(${MIN_COLUMN}, 1fr))`,
+        }}
+      >
+        {visibleColumns.map((column) => {
+          const visible = column.items.slice(0, COLUMN_LIMIT);
+          const overflow = column.items.length - visible.length;
+
+          return (
+            <section
+              key={column.key}
+              aria-label={`${column.label}, ${column.items.length} items`}
+              onDragOver={(event) => {
+                if (!canUpdate || !dragging) return;
+                // Without this the drop never fires: the default handling of
+                // dragover is to reject the drop.
+                event.preventDefault();
+                setOver(column.key);
+              }}
+              onDragLeave={() => setOver((current) => (current === column.key ? null : current))}
+              onDrop={(event) => {
+                event.preventDefault();
+                setOver(null);
+                const id = event.dataTransfer.getData('text/plain');
+                const item = optimistic.find((entry) => entry.id === id);
+                if (item) move(item, column.key);
+              }}
+              className={cn(
+                'group/col flex min-w-0 flex-col rounded-xl border transition-colors',
+                over === column.key
+                  ? 'border-accent-500 bg-accent-500/5'
+                  : 'border-line-subtle bg-surface-sunken/40',
+              )}
+            >
+              <header className="flex items-center justify-between gap-2 px-3 py-2.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Badge tone={asTone(column.tone)} dot size="sm">
+                    {column.label}
+                  </Badge>
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <span className="text-2xs font-medium text-fg-subtle tabular-nums">
+                    {column.items.length}
+                  </span>
+                  {/*
+                  Only offered while more than one column is showing — hiding
+                  the last one would leave a board with nothing on it and no
+                  obvious way back.
+                */}
+                  {visibleColumns.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleHidden(column.key)}
+                      aria-label={`Hide the ${column.label} column`}
+                      title={`Hide ${column.label}`}
+                      className="rounded p-0.5 text-fg-subtle opacity-0 transition-opacity group-hover/col:opacity-100 hover:text-fg focus-visible:opacity-100"
+                    >
+                      <EyeOff aria-hidden className="size-3" />
+                    </button>
+                  ) : null}
+                </div>
+              </header>
+
+              <div className="flex min-h-24 flex-1 flex-col gap-2 px-2 pb-2">
+                {visible.map((item) => (
+                  <BoardCard
+                    key={item.id}
+                    item={item}
+                    statuses={statuses}
+                    status={item.status}
+                    canUpdate={canUpdate}
+                    dragging={dragging === item.id}
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData('text/plain', item.id);
+                      event.dataTransfer.effectAllowed = 'move';
+                      setDragging(item.id);
+                    }}
+                    onDragEnd={() => {
+                      setDragging(null);
+                      setOver(null);
+                    }}
+                    onMove={(status) => move(item, status)}
+                  />
+                ))}
+
+                {column.items.length === 0 ? (
+                  <p className="px-1 py-6 text-center text-xs text-fg-subtle">Nothing here</p>
+                ) : null}
+
+                {overflow > 0 ? (
+                  <p className="px-1 pt-1 text-center text-xs text-fg-subtle">
+                    and {overflow} more — narrow the filters to see them
+                  </p>
+                ) : null}
               </div>
-              <span className="text-2xs font-medium text-fg-subtle tabular-nums">
-                {column.items.length}
-              </span>
-            </header>
-
-            <div className="flex min-h-24 flex-1 flex-col gap-2 px-2 pb-2">
-              {visible.map((item) => (
-                <BoardCard
-                  key={item.id}
-                  item={item}
-                  statuses={statuses}
-                  status={item.status}
-                  canUpdate={canUpdate}
-                  dragging={dragging === item.id}
-                  onDragStart={(event) => {
-                    event.dataTransfer.setData('text/plain', item.id);
-                    event.dataTransfer.effectAllowed = 'move';
-                    setDragging(item.id);
-                  }}
-                  onDragEnd={() => {
-                    setDragging(null);
-                    setOver(null);
-                  }}
-                  onMove={(status) => move(item, status)}
-                />
-              ))}
-
-              {column.items.length === 0 ? (
-                <p className="px-1 py-6 text-center text-xs text-fg-subtle">Nothing here</p>
-              ) : null}
-
-              {overflow > 0 ? (
-                <p className="px-1 pt-1 text-center text-xs text-fg-subtle">
-                  and {overflow} more — narrow the filters to see them
-                </p>
-              ) : null}
-            </div>
-          </section>
-        );
-      })}
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

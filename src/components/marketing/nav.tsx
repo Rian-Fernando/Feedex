@@ -9,12 +9,18 @@ import { cn } from '@/lib/cn';
 import { Logo } from '@/components/brand/logo';
 import { Button } from '@/components/ui/button';
 
+/*
+  Root-relative, not bare fragments. A bare `#features` resolves against
+  whatever page you are on, so from /docs these did nothing at all — the URL
+  gained a fragment that matched no element. `/#features` navigates home and
+  then scrolls.
+*/
 const LINKS = [
-  { href: '#features', label: 'Features' },
-  { href: '#tour', label: 'How it works' },
-  { href: '#developers', label: 'Developers' },
+  { href: '/#features', label: 'Features' },
+  { href: '/#tour', label: 'How it works' },
+  { href: '/#developers', label: 'Developers' },
   { href: '/docs', label: 'Docs' },
-  { href: '#faq', label: 'FAQ' },
+  { href: '/#faq', label: 'FAQ' },
 ] as const;
 
 /**
