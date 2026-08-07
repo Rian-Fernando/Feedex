@@ -19,6 +19,7 @@ export const ID_PREFIX = {
   note: 'nte',
   apiKey: 'key',
   label: 'lbl',
+  savedView: 'viw',
   activity: 'act',
 } as const;
 

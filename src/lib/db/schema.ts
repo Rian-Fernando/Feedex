@@ -286,6 +286,39 @@ export const workspaceInvitations = pgTable(
   ],
 );
 
+/**
+ * A named filter combination.
+ *
+ * Triage is the same few questions asked repeatedly — "my open bugs", "anything
+ * critical this week" — and rebuilding the filters each time is the friction
+ * that stops people looking. The query is stored as the URL's own search
+ * string rather than as parsed columns, so a view is literally a link: adding a
+ * new filter later does not need a migration, and an old view keeps working
+ * because unknown parameters were already ignored.
+ *
+ * Owned by a user within a workspace. Shared views would need a permission
+ * model of their own, and the thing people actually want first is their own
+ * shortcut.
+ */
+export const savedViews = pgTable(
+  'saved_views',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 60 }).notNull(),
+    /** The query string, without a leading `?`. */
+    query: varchar('query', { length: 1024 }).notNull(),
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('saved_views_owner_idx').on(table.workspaceId, table.userId, table.position)],
+);
+
 /* -------------------------------------------------------------------------- */
 /*                                  Projects                                  */
 /* -------------------------------------------------------------------------- */
@@ -681,6 +714,7 @@ export type FeedbackStatus = string;
 export type BuiltInCategory = (typeof feedbackCategory.enumValues)[number];
 export type BuiltInStatus = (typeof feedbackStatus.enumValues)[number];
 
+export type SavedView = typeof savedViews.$inferSelect;
 export type WorkspaceInvitation = typeof workspaceInvitations.$inferSelect;
 export type WorkspaceLabel = typeof workspaceLabels.$inferSelect;
 export type NewWorkspaceLabel = typeof workspaceLabels.$inferInsert;

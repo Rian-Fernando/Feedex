@@ -687,3 +687,79 @@ export async function openStatusFilter(workspaceId: string) {
   const { openStatusKeys } = await getVocabulary(workspaceId);
   return inArray(feedback.status, openStatusKeys.length ? openStatusKeys : ['']);
 }
+
+/* ------------------------------ Bulk actions ------------------------------ */
+
+export interface BulkUpdateInput {
+  status?: FeedbackStatus;
+  priority?: FeedbackPriority;
+  category?: FeedbackCategory;
+}
+
+/**
+ * Applies one change across many reports.
+ *
+ * Scoped by workspace in the same statement that selects the ids, so a crafted
+ * list of ids from another tenant updates nothing rather than being checked
+ * and then trusted. Returns the number of rows actually touched, which is what
+ * the UI reports — claiming "12 updated" when the query matched 9 would hide
+ * exactly the case worth noticing.
+ */
+export async function bulkUpdateFeedback(
+  workspaceId: string,
+  ids: string[],
+  input: BulkUpdateInput,
+): Promise<number> {
+  if (ids.length === 0) return 0;
+
+  const db = await getDb();
+  const vocabulary = await getVocabulary(workspaceId);
+
+  if (input.status && !vocabulary.statuses.some((entry) => entry.key === input.status)) {
+    throw AppError.validation('That status does not exist in this workspace.');
+  }
+
+  if (input.category && !vocabulary.categories.some((entry) => entry.key === input.category)) {
+    throw AppError.validation('That category does not exist in this workspace.');
+  }
+
+  const doneKeys = new Set(vocabulary.doneStatusKeys);
+
+  const rows = await db
+    .update(feedback)
+    .set({
+      ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(input.priority !== undefined ? { priority: input.priority } : {}),
+      ...(input.category !== undefined ? { category: input.category } : {}),
+      /*
+        Kept consistent with the single-item path: moving into a finished
+        status stamps the resolution time, and moving back out clears it. A
+        bulk edit that skipped this would quietly produce rows whose
+        `resolved_at` disagrees with their status.
+      */
+      ...(input.status !== undefined
+        ? doneKeys.has(input.status)
+          ? { resolvedAt: new Date() }
+          : { resolvedAt: null }
+        : {}),
+      updatedAt: new Date(),
+    })
+    .where(and(eq(feedback.workspaceId, workspaceId), inArray(feedback.id, ids)))
+    .returning({ id: feedback.id });
+
+  return rows.length;
+}
+
+/** Deletes many reports at once, workspace-scoped. Returns the count removed. */
+export async function bulkDeleteFeedback(workspaceId: string, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+
+  const db = await getDb();
+
+  const rows = await db
+    .delete(feedback)
+    .where(and(eq(feedback.workspaceId, workspaceId), inArray(feedback.id, ids)))
+    .returning({ id: feedback.id });
+
+  return rows.length;
+}

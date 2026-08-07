@@ -6,10 +6,12 @@ import { can, requireWorkspace } from '@/lib/auth';
 import { listFeedback } from '@/server/services/feedback';
 import { listProjects } from '@/server/services/projects';
 import { getVocabulary } from '@/server/services/labels';
+import { listViews } from '@/server/services/views';
+import { FeedbackList } from '@/components/dashboard/feedback-list';
+import { SavedViews } from '@/components/dashboard/saved-views';
 import { feedbackFilterSchema } from '@/lib/validation';
 import { PageHeader } from '@/components/dashboard/shell';
 import { FeedbackFilters } from '@/components/dashboard/feedback-filters';
-import { FeedbackRow } from '@/components/dashboard/feedback-row';
 import { FeedbackBoard } from '@/components/dashboard/feedback-board';
 import { ViewSwitcher, type FeedbackView } from '@/components/dashboard/view-switcher';
 import { Button } from '@/components/ui/button';
@@ -41,13 +43,14 @@ export default async function FeedbackPage({
     hundred open items a board stops being readable anyway, and the columns
     say so rather than silently truncating.
   */
-  const [result, projects, vocabulary] = await Promise.all([
+  const [result, projects, vocabulary, views] = await Promise.all([
     listFeedback(
       context.workspaceId,
       view === 'board' ? { ...filter, page: 1, perPage: 100 } : filter,
     ),
     listProjects(context.workspaceId),
     getVocabulary(context.workspaceId),
+    listViews(context.workspaceId, context.user.id),
   ]);
 
   const pageParams = (page: number) => {
@@ -69,6 +72,8 @@ export default async function FeedbackPage({
             : `${result.total} ${result.total === 1 ? 'item' : 'items'}`
         }
       />
+
+      <SavedViews views={views.map((v) => ({ id: v.id, name: v.name, query: v.query }))} />
 
       <div className="mb-3 flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
@@ -124,13 +129,13 @@ export default async function FeedbackPage({
                 }
               />
             ) : (
-              <ul className="divide-y divide-line-subtle">
-                {result.items.map((item) => (
-                  <li key={item.id}>
-                    <FeedbackRow item={item} />
-                  </li>
-                ))}
-              </ul>
+              <FeedbackList
+                items={result.items}
+                statuses={vocabulary.statuses}
+                categories={vocabulary.categories}
+                canUpdate={can(context.role, 'feedback.update')}
+                canDelete={can(context.role, 'feedback.delete')}
+              />
             )}
           </CardContent>
         </Card>
