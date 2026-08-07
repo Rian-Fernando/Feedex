@@ -233,6 +233,14 @@ export const workspaceLabels = pgTable(
     /** Display order, and column order on the board. */
     position: integer('position').notNull().default(0),
     /**
+     * Whether items in this status may appear on a public roadmap at all.
+     *
+     * A second gate above `feedback.is_public`: a workspace can keep an entire
+     * status internal — "Triage", say — without having to remember not to
+     * publish anything sitting in it.
+     */
+    isPublic: boolean('is_public').notNull().default(true),
+    /**
      * Built-in labels may be renamed and reordered but not deleted, because
      * ingestion falls back to them and existing rows point at them.
      */
@@ -346,6 +354,13 @@ export const projects = pgTable(
      * several projects almost certainly has several repositories.
      */
     githubRepo: varchar('github_repo', { length: 140 }),
+    /** Serves a public roadmap at /roadmap/<public_slug>. */
+    roadmapEnabled: boolean('roadmap_enabled').notNull().default(false),
+    /**
+     * Globally unique, unlike `slug`, which is only unique within a workspace.
+     * A public URL cannot be scoped to a tenant, so it needs its own key.
+     */
+    publicSlug: varchar('public_slug', { length: 80 }),
     widgetSettings: jsonb('widget_settings')
       .$type<WidgetSettings>()
       .notNull()
@@ -355,6 +370,7 @@ export const projects = pgTable(
   },
   (table) => [
     uniqueIndex('projects_workspace_slug_unique').on(table.workspaceId, table.slug),
+    uniqueIndex('projects_public_slug_unique').on(table.publicSlug),
     index('projects_workspace_id_idx').on(table.workspaceId),
   ],
 );
@@ -465,6 +481,19 @@ export const feedback = pgTable(
      * unmerged again.
      */
     duplicateOfId: text('duplicate_of_id'),
+
+    /**
+     * Whether this report appears on the project's public roadmap.
+     *
+     * Opt-in per item, and false by default. A reporter writes into a private
+     * box: descriptions routinely carry account details, internal URLs, and
+     * the occasional password. Publishing a whole queue because a project
+     * switched a feature on would be a disclosure incident, so the roadmap is
+     * curated rather than mirrored — somebody chooses each item.
+     */
+    isPublic: boolean('is_public').notNull().default(false),
+    /** Optional public-facing title, when the reporter's wording is unusable. */
+    publicTitle: varchar('public_title', { length: 200 }),
 
     assignedToId: text('assigned_to_id').references(() => users.id, { onDelete: 'set null' }),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),

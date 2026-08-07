@@ -10,6 +10,7 @@ import { listFeedback } from '@/server/services/feedback';
 import { getVocabulary } from '@/server/services/labels';
 import { connectedToGithub } from '@/server/actions/github';
 import { GithubPanel } from '@/components/dashboard/github-panel';
+import { RoadmapPanel } from '@/components/dashboard/roadmap-controls';
 import { can } from '@/lib/auth';
 import { PageHeader } from '@/components/dashboard/shell';
 import { InstallSnippet } from '@/components/dashboard/install-snippet';
@@ -169,6 +170,12 @@ export default async function ProjectDetailPage({
         <TabsContent value="settings" className="flex flex-col gap-4 pt-6">
           <ProjectSettingsForm project={project} />
           <WidgetSettingsForm project={project} categories={vocabulary.categories} />
+          <RoadmapPanel
+            projectId={project.id}
+            enabled={project.roadmapEnabled}
+            publicUrl={project.publicSlug ? absoluteUrl(`/roadmap/${project.publicSlug}`) : null}
+            canEdit={can(context.role, 'project.update')}
+          />
           <GithubPanel
             projectId={project.id}
             repo={project.githubRepo}

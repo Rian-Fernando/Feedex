@@ -50,6 +50,13 @@
       "when": 1786141728453,
       "tag": "0006_duplicates",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786142827132,
+      "tag": "0007_public_roadmap",
+      "breakpoints": true
     }
   ]
 }

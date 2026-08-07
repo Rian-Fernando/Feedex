@@ -23,6 +23,7 @@ import {
   listNotes,
 } from '@/server/services/feedback';
 import { DuplicatesPanel } from '@/components/dashboard/duplicates-panel';
+import { PublishToggle } from '@/components/dashboard/roadmap-controls';
 import { can } from '@/lib/auth';
 import { getVocabulary } from '@/server/services/labels';
 import { getProject } from '@/server/services/projects';
@@ -289,6 +290,15 @@ export default async function FeedbackDetailPage({ params }: { params: Promise<{
               />
             </CardContent>
           </Card>
+
+          <PublishToggle
+            feedbackId={item.id}
+            isPublic={item.isPublic}
+            publicTitle={item.publicTitle}
+            title={item.title}
+            roadmapEnabled={project?.roadmapEnabled ?? false}
+            canUpdate={can(context.role, 'feedback.update')}
+          />
 
           <Card>
             <CardHeader>
