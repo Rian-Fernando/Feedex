@@ -1,0 +1,1 @@
+ALTER TABLE "feedback" ADD COLUMN "duplicate_of_id" text;

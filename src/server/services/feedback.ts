@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, asc, count, desc, eq, gte, ilike, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lt, or, sql } from 'drizzle-orm';
 
 import { getDb } from '@/lib/db';
 import {
@@ -18,6 +18,7 @@ import {
 import { createId, ID_PREFIX } from '@/lib/ids';
 import { AppError } from '@/lib/errors';
 import { base64ByteLength } from '@/lib/attachments';
+import { findDuplicates } from '@/lib/similarity';
 import { PRIORITY_WEIGHT } from '@/lib/taxonomy';
 import { getVocabulary, type WorkspaceVocabulary } from '@/server/services/labels';
 import type { FeedbackFilterInput, UpdateFeedbackInput } from '@/lib/validation';
@@ -90,6 +91,14 @@ export async function listFeedback(
 ): Promise<PaginatedFeedback> {
   const db = await getDb();
   const conditions = [eq(feedback.workspaceId, workspaceId)];
+
+  /*
+    Merged duplicates are hidden from every list and board. They still exist,
+    and are still reachable from the report they were folded into — but the
+    queue is a list of things needing a decision, and a duplicate has already
+    had one.
+  */
+  conditions.push(isNull(feedback.duplicateOfId));
 
   if (filter.projectId) conditions.push(eq(feedback.projectId, filter.projectId));
   if (filter.status) conditions.push(eq(feedback.status, filter.status));
@@ -762,4 +771,142 @@ export async function bulkDeleteFeedback(workspaceId: string, ids: string[]): Pr
     .returning({ id: feedback.id });
 
   return rows.length;
+}
+
+/* ------------------------------- Duplicates ------------------------------- */
+
+/**
+ * Reports that look like duplicates of this one.
+ *
+ * Compares against recent open items in the same project only. Scanning the
+ * whole workspace would surface a matching bug from a different site, and
+ * scanning history would resurface things that were closed years ago — both
+ * are noise at the moment somebody is trying to triage one item.
+ */
+export async function findDuplicateCandidates(
+  workspaceId: string,
+  feedbackId: string,
+): Promise<
+  Array<{ id: string; reference: number; title: string; score: number; reasons: string[] }>
+> {
+  const target = await getFeedback(workspaceId, feedbackId);
+  if (!target) return [];
+
+  const db = await getDb();
+  const { openStatusKeys } = await getVocabulary(workspaceId);
+
+  const rows = await db
+    .select({
+      id: feedback.id,
+      reference: feedback.reference,
+      title: feedback.title,
+      description: feedback.description,
+      context: feedback.context,
+    })
+    .from(feedback)
+    .where(
+      and(
+        eq(feedback.workspaceId, workspaceId),
+        eq(feedback.projectId, target.projectId),
+        // Already-merged rows are not candidates; they are the answer to a
+        // question somebody already settled.
+        isNull(feedback.duplicateOfId),
+        inArray(feedback.status, openStatusKeys.length ? openStatusKeys : ['']),
+      ),
+    )
+    .orderBy(desc(feedback.createdAt))
+    .limit(200);
+
+  return findDuplicates(
+    {
+      id: target.id,
+      title: target.title,
+      description: target.description,
+      context: target.context as { path?: string },
+    },
+    rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      context: (row.context ?? {}) as { path?: string },
+    })),
+  ).map((candidate) => {
+    const row = rows.find((entry) => entry.id === candidate.item.id)!;
+    return {
+      id: row.id,
+      reference: row.reference,
+      title: row.title,
+      score: candidate.score,
+      reasons: candidate.reasons,
+    };
+  });
+}
+
+/**
+ * Folds one report into another as a duplicate.
+ *
+ * The duplicate is kept, not deleted: three people reporting the same bug is
+ * how you know it matters, and their email addresses are who to tell when it
+ * ships. It is marked, moved to the canonical item's status, and drops out of
+ * the default queue.
+ */
+export async function mergeFeedback(
+  workspaceId: string,
+  duplicateId: string,
+  canonicalId: string,
+): Promise<void> {
+  if (duplicateId === canonicalId) {
+    throw AppError.validation('A report cannot be a duplicate of itself.');
+  }
+
+  const db = await getDb();
+
+  const [duplicate, canonical] = await Promise.all([
+    getFeedback(workspaceId, duplicateId),
+    getFeedback(workspaceId, canonicalId),
+  ]);
+
+  if (!duplicate || !canonical) throw AppError.notFound('Feedback not found.');
+
+  // Merging into something that is itself a duplicate would build a chain the
+  // UI would have to walk. Point at the end of it instead.
+  if (canonical.duplicateOfId) {
+    throw AppError.validation(
+      'That report is already marked as a duplicate. Merge into the original instead.',
+    );
+  }
+
+  await db
+    .update(feedback)
+    .set({ duplicateOfId: canonicalId, status: canonical.status, updatedAt: new Date() })
+    .where(and(eq(feedback.workspaceId, workspaceId), eq(feedback.id, duplicateId)));
+}
+
+/** Detaches a merged report so it returns to the queue on its own. */
+export async function unmergeFeedback(workspaceId: string, feedbackId: string): Promise<void> {
+  const db = await getDb();
+
+  await db
+    .update(feedback)
+    .set({ duplicateOfId: null, updatedAt: new Date() })
+    .where(and(eq(feedback.workspaceId, workspaceId), eq(feedback.id, feedbackId)));
+}
+
+/** Reports merged into this one. */
+export async function listDuplicatesOf(
+  workspaceId: string,
+  feedbackId: string,
+): Promise<Array<{ id: string; reference: number; title: string; reporterEmail: string | null }>> {
+  const db = await getDb();
+
+  return db
+    .select({
+      id: feedback.id,
+      reference: feedback.reference,
+      title: feedback.title,
+      reporterEmail: feedback.reporterEmail,
+    })
+    .from(feedback)
+    .where(and(eq(feedback.workspaceId, workspaceId), eq(feedback.duplicateOfId, feedbackId)))
+    .orderBy(asc(feedback.createdAt));
 }

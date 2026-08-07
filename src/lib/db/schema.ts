@@ -452,6 +452,20 @@ export const feedback = pgTable(
     githubIssueUrl: text('github_issue_url'),
     githubIssueNumber: integer('github_issue_number'),
 
+    /**
+     * Set when this report was merged into another as a duplicate.
+     *
+     * The row is kept rather than deleted. Three people reporting the same bug
+     * is information — it is how you know it is worth fixing first — and the
+     * reporters' email addresses are the list to tell when it ships. Merging
+     * folds a duplicate out of the queue without discarding any of that.
+     *
+     * `set null` on delete rather than cascade: removing the canonical report
+     * must not silently take its duplicates with it. They simply become
+     * unmerged again.
+     */
+    duplicateOfId: text('duplicate_of_id'),
+
     assignedToId: text('assigned_to_id').references(() => users.id, { onDelete: 'set null' }),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
 

@@ -15,7 +15,15 @@ import {
 } from 'lucide-react';
 
 import { requireWorkspace } from '@/lib/auth';
-import { getFeedback, listAttachments, listNotes } from '@/server/services/feedback';
+import {
+  findDuplicateCandidates,
+  getFeedback,
+  listAttachments,
+  listDuplicatesOf,
+  listNotes,
+} from '@/server/services/feedback';
+import { DuplicatesPanel } from '@/components/dashboard/duplicates-panel';
+import { can } from '@/lib/auth';
 import { getVocabulary } from '@/server/services/labels';
 import { getProject } from '@/server/services/projects';
 import { CreateIssueButton } from '@/components/dashboard/github-panel';
@@ -51,12 +59,20 @@ export default async function FeedbackDetailPage({ params }: { params: Promise<{
   const item = await getFeedback(context.workspaceId, id);
   if (!item) notFound();
 
-  const [notes, attachments, vocabulary, project] = await Promise.all([
-    listNotes(context.workspaceId, id),
-    listAttachments(context.workspaceId, id),
-    getVocabulary(context.workspaceId),
-    getProject(context.workspaceId, item.projectId),
-  ]);
+  const [notes, attachments, vocabulary, project, candidates, merged, canonical] =
+    await Promise.all([
+      listNotes(context.workspaceId, id),
+      listAttachments(context.workspaceId, id),
+      getVocabulary(context.workspaceId),
+      getProject(context.workspaceId, item.projectId),
+      // Only worth computing for a report that is not already resolved as a
+      // duplicate itself.
+      item.duplicateOfId ? Promise.resolve([]) : findDuplicateCandidates(context.workspaceId, id),
+      listDuplicatesOf(context.workspaceId, id),
+      item.duplicateOfId
+        ? getFeedback(context.workspaceId, item.duplicateOfId)
+        : Promise.resolve(null),
+    ]);
 
   const priority = priorityMeta(item.priority);
   const DeviceIcon = item.context.device ? DEVICE_ICONS[item.context.device] : null;
@@ -149,6 +165,18 @@ export default async function FeedbackDetailPage({ params }: { params: Promise<{
               </div>
             </CardContent>
           </Card>
+
+          <DuplicatesPanel
+            feedbackId={item.id}
+            candidates={candidates}
+            merged={merged}
+            duplicateOf={
+              canonical
+                ? { id: canonical.id, reference: canonical.reference, title: canonical.title }
+                : null
+            }
+            canUpdate={can(context.role, 'feedback.update')}
+          />
 
           <Card>
             <CardHeader>
