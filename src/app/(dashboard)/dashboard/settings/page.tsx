@@ -5,6 +5,9 @@ import { can, requireWorkspace } from '@/lib/auth';
 import { databaseDriver } from '@/lib/db';
 import { getWorkspace, listInvitations, listMembers } from '@/server/services/workspaces';
 import { MembersPanel } from '@/components/dashboard/members-panel';
+import { NotificationSettings } from '@/components/dashboard/notification-settings';
+import { getNotificationPreferences } from '@/server/services/notifications';
+import { emailConfigured } from '@/lib/email';
 import { getVocabulary } from '@/server/services/labels';
 import { LabelManager } from '@/components/dashboard/label-manager';
 import { PageHeader } from '@/components/dashboard/shell';
@@ -27,11 +30,12 @@ export const metadata: Metadata = {
 export default async function SettingsPage() {
   const context = await requireWorkspace();
 
-  const [workspace, members, vocabulary, invitations] = await Promise.all([
+  const [workspace, members, vocabulary, invitations, notifications] = await Promise.all([
     getWorkspace(context.workspaceId),
     listMembers(context.workspaceId),
     getVocabulary(context.workspaceId),
     listInvitations(context.workspaceId),
+    getNotificationPreferences(context.workspaceId, context.user.id),
   ]);
 
   const canEditWorkspace = can(context.role, 'workspace.update');
@@ -51,6 +55,7 @@ export default async function SettingsPage() {
 
         <TabsContent value="account" className="flex max-w-2xl flex-col gap-4 pt-6">
           <ProfileForm user={{ name: context.user.name, email: context.user.email }} />
+          <NotificationSettings preferences={notifications} configured={emailConfigured()} />
           <AppearanceForm />
           <PasswordForm />
         </TabsContent>

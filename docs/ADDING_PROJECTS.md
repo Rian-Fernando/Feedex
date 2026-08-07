@@ -244,6 +244,26 @@ removed.
 
 ---
 
+## Email notifications
+
+Settings → **Notifications**, per person per workspace. Off by default, with an
+optional priority floor so you can ask for "high and above" and still be told
+about a critical one.
+
+**This instance needs a mail provider before anything is sent.** Set two
+environment variables in Vercel:
+
+| Variable         | Value                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------ |
+| `RESEND_API_KEY` | From [resend.com](https://resend.com) — the free tier is 3,000 emails/month          |
+| `EMAIL_FROM`     | A verified sender on a domain you control, e.g. `Feedex <feedback@rianfernando.com>` |
+
+With either missing, notifications are skipped silently and nothing else
+changes — Feedex still needs only a database to run. The settings page says so
+plainly rather than letting a switch appear to do nothing.
+
+---
+
 ## Troubleshooting
 
 **The badge stays on Waiting.**

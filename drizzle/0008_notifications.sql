@@ -1,0 +1,1 @@
+ALTER TABLE "workspace_members" ADD COLUMN "notifications" jsonb DEFAULT '{}'::jsonb NOT NULL;

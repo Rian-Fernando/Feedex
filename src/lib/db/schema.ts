@@ -185,6 +185,11 @@ export const workspaceMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     role: workspaceRole('role').notNull().default('member'),
+    /** Per-member notification settings for this workspace. */
+    notifications: jsonb('notifications')
+      .$type<NotificationPreferences>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -662,6 +667,20 @@ export const activitiesRelations = relations(activities, ({ one }) => ({
 /* -------------------------------------------------------------------------- */
 /*                              JSONB payload types                           */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * When a member wants to hear about new feedback.
+ *
+ * Per member per workspace rather than per workspace: two people on the same
+ * project want different amounts of interruption, and a single setting means
+ * the person who wants none turns it off for everybody.
+ */
+export interface NotificationPreferences {
+  /** Email on every new report. Off by default — opt in, not out. */
+  newFeedback?: boolean;
+  /** Only notify at or above this priority. */
+  minPriority?: 'low' | 'medium' | 'high' | 'critical';
+}
 
 export interface UserPreferences {
   theme?: 'light' | 'dark' | 'system';

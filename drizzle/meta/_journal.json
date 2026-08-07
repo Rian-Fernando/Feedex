@@ -57,6 +57,13 @@
       "when": 1786142827132,
       "tag": "0007_public_roadmap",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786143949309,
+      "tag": "0008_notifications",
+      "breakpoints": true
     }
   ]
 }

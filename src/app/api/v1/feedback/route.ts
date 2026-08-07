@@ -7,6 +7,7 @@ import { apiError, clientIp, INGEST_CORS_HEADERS, withCors } from '@/lib/api/res
 import { authenticateApiKey, originAllowed, touchApiKey } from '@/server/services/api-auth';
 import { ingestFeedback } from '@/server/services/feedback';
 import { recordActivity } from '@/server/services/activity';
+import { notifyNewFeedback } from '@/server/services/notifications';
 
 /**
  * Widget ingestion endpoint.
@@ -95,6 +96,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // Post-response bookkeeping: none of it may fail the submission.
     void touchApiKey(context.keyId);
+    void notifyNewFeedback({
+      workspaceId: context.workspaceId,
+      projectName: context.project.name,
+      feedback: created,
+      categoryLabel: created.category,
+    }).catch((error) => console.error('[feedex] notification failed', error));
     void recordActivity({
       workspaceId: context.workspaceId,
       action: 'feedback.created',
